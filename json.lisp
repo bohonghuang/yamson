@@ -4,34 +4,37 @@
   (or (progn '"true" (constantly t)) (progn '"false" (constantly nil))))
 
 (defparser json-digit ()
-  (for ((digit (or '#\0 '#\1 '#\2 '#\3 '#\4 '#\5 '#\6 '#\7 '#\8 '#\9)))
-    (- (char-int digit) (char-int #\0))))
+  (for ((digit (satisfies (lambda (char) (<= #.(char-code #\0) (char-code char) #.(char-code #\9))))))
+    (- (char-code digit) (char-code #\0))))
 
-(declaim (ftype (function (list) non-negative-fixnum) digits-integer))
+(declaim (ftype (function (list) (values non-negative-fixnum)) digits-integer)
+         (inline digits-integer))
 (defun digits-integer (digits)
-  (loop :for digit :of-type (integer 0 10) :in (nreverse digits)
-        :for base :of-type non-negative-fixnum := 1 :then (* base 10)
-        :sum (the non-negative-fixnum (* digit base)) :of-type non-negative-fixnum))
+  (loop :for digit :of-type (mod 10) :in digits
+        :for number :of-type non-negative-fixnum := digit :then (+ (the non-negative-fixnum (* number 10)) digit)
+        :finally (return number)))
 
 (defparser json-integer ()
   (for ((digits (rep (json-digit) 1)))
     (digits-integer digits)))
 
-(declaim (ftype (function (fixnum non-negative-fixnum) single-float) integers-float))
-(defun integers-float (integer decimal)
-  (let ((sign (if (minusp integer) -1 1))
-        (abs-int (abs integer))
-        (abs-dec (abs decimal)))
-    (* sign (+ abs-int (if (zerop abs-dec) 0.0 (/ (coerce abs-dec 'single-float) (expt 10.0 (1+ (floor (log abs-dec 10))))))))))
+(declaim (ftype (function (list list) (values single-float)) integers-float)
+         (inline digits-float))
+(defun digits-float (integer-digits decimal-digits)
+  (loop :for digit :of-type (mod 10) :in integer-digits
+        :for integer-part :of-type single-float := (coerce digit 'single-float) :then (+ (* integer-part 10.0) digit)
+        :finally
+           (loop :for digit :of-type (mod 10) :in decimal-digits
+                 :for base :of-type single-float := 0.1 :then (* base 0.1)
+                 :sum (* digit base) :into decimal-part :of-type single-float
+                 :finally (return-from digits-float (+ integer-part decimal-part)))))
 
 (defparser json-number ()
-  (for ((number (list (opt '"-") (json-integer) (opt (progn '"." (json-integer))))))
-    (destructuring-bind (sign integer decimal) number
-      (declare (type non-negative-fixnum integer)
-               (type (or non-negative-fixnum null) decimal))
-      (if decimal
-          (* (integers-float integer decimal) (if sign -1.0 1.0))
-          (* integer (if sign -1 1))))))
+  (for ((number (list (opt '#\-) (rep (json-digit) 1) (opt (progn '"." (rep (json-digit) 1))))))
+    (destructuring-bind (negativep integer-digits decimal-digits) number
+      (if decimal-digits
+          (* (digits-float integer-digits decimal-digits) (if negativep -1.0 1.0))
+          (* (digits-integer integer-digits) (if negativep -1 1))))))
 
 (defparser json-string-escape-char ()
   (or (progn '#\n (constantly #\Newline))

@@ -60,6 +60,7 @@
 (defparser yaml-value (level &optional array-element-p)
   (funcall
    (lambda (level)
+     (declare (type fixnum level))
      (parser (or (json-value)
                  (funcall
                   (lambda ()
