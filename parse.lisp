@@ -10,7 +10,9 @@
    string))
 
 (define-condition yamson-parse-error ()
-  ((position :initarg :position)))
+  ((position :initarg :position :reader yamson-parse-error-position))
+  (:report (lambda (condition stream)
+             (format stream "Parse error at position ~A" (yamson-parse-error-position condition)))))
 
 (defun parse (object &rest args)
   (multiple-value-bind (result errorp)

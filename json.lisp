@@ -46,9 +46,9 @@
       (progn '#\" (constantly #\"))))
 
 (defparser json-string ()
-  (for ((characters (prog2 '"\""
-                        (rep (or (progn '"\\" (json-string-escape-char)) (satisfies (lambda (x) (not (eql x #\"))))))
-                      '"\"")))
+  (for ((characters (prog2 '#\"
+                        (rep (or (progn '#\\ (cut (json-string-escape-char))) (satisfies (lambda (x) (not (eql x #\"))))))
+                      (cut '#\"))))
     (coerce (the list characters) 'string)))
 
 (defparser json-whitespace ()
@@ -64,15 +64,15 @@
   (or (json-boolean) (json-string) (json-number) (json-array) (json-object) (json-null)))
 
 (defparser json-array ()
-  (for ((list (prog2 '"[" (repsep (json-trim (json-value)) '",") '"]")))
+  (for ((list (prog2 '#\[ (opt (cons #1=(json-trim (json-value)) (rep (progn '#\, (cut #1#))))) (cut '#\]))))
     (copy-list list)))
 
 (defparser json-field ()
   (for ((key (json-trim (json-string)))
-        (nil '":")
-        (value (json-trim (json-value))))
+        (nil (cut '#\:))
+        (value (cut (json-trim (cut (json-value))))))
     (cons key value)))
 
 (defparser json-object ()
-  (for ((alist (prog2 '"{" (repsep (json-field) '",") '"}")))
+  (for ((alist (prog2 '#\{ (opt (cons #1=(json-field) (rep (progn '#\, (cut #1#))))) (cut '#\}))))
     (copy-list alist)))
