@@ -14,7 +14,7 @@
   (or (char= char #\Newline) (char= char #\Return)))
 
 (defparser yaml-comment ()
-  (for ((comment (progn '"#" (rep (satisfies (complement #'yaml-newline-char-p))))))
+  (for ((comment (progn '#\# (rep (satisfies (complement #'yaml-newline-char-p))))))
     (coerce comment 'string)))
 
 (defparser yaml-eol ()
@@ -47,7 +47,7 @@
 
 (defparser yaml-array (level)
   (for ((elems (repsep
-                (progn '"-" (yaml-value level t))
+                (progn '#\- (yaml-value level t))
                 (yaml-newline-indent level level)
                 1)))
     (copy-list elems)))
@@ -74,7 +74,7 @@
 
 (defparser yaml-field (level)
   (for ((key (yaml-identifier))
-        (nil '":")
+        (nil '#\:)
         (value (yaml-value level)))
     (cons key value)))
 
