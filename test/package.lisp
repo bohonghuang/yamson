@@ -18,6 +18,18 @@
   (is = -0.5 (parse "-0.5"))
   (is = 123.0 (parse "123.0")))
 
+(define-test json-scientific :parent json-number
+  (is = 1.23e-4 (parse "1.23e-4"))
+  (is = -1.23e-4 (parse "-1.23e-4"))
+  (is = 1.23e4 (parse "1.23e4"))
+  (is = -1.23e4 (parse "-1.23e4"))
+  (is = 1.23E-4 (parse "1.23E-4"))
+  (is = -1.23E-4 (parse "-1.23E-4"))
+  (is = 1.23E4 (parse "1.23E4"))
+  (is = -1.23E4 (parse "-1.23E4"))
+  (is = 12300.0 (parse "1.23e4"))
+  (is = 0.000123 (parse "1.23e-4")))
+
 (define-test json-string :parent suite
   (is string= "hello" (parse "\"hello\""))
   (is string= "hello
