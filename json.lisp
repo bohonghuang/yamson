@@ -15,8 +15,10 @@
         :finally (return number)))
 
 (defparser json-integer ()
-  (for ((digits (rep (json-digit) 1)))
-    (digits-integer digits)))
+  (for ((sign (or (progn '#\- (constantly -1)) (progn (opt '#\+) (constantly +1))))
+        (digits (rep (json-digit) 1)))
+    (declare (type (integer -1 +1) sign))
+    (* (digits-integer digits) sign)))
 
 (declaim (ftype (function (list list) (values single-float)) integers-float)
          (inline digits-float))
@@ -30,11 +32,15 @@
                  :finally (return-from digits-float (+ integer-part decimal-part)))))
 
 (defparser json-number ()
-  (for ((number (list (opt '#\-) (rep (json-digit) 1) (opt (progn '"." (rep (json-digit) 1))))))
-    (destructuring-bind (negativep integer-digits decimal-digits) number
-      (if decimal-digits
-          (* (digits-float integer-digits decimal-digits) (if negativep -1.0 1.0))
-          (* (digits-integer integer-digits) (if negativep -1 1))))))
+  (for ((sign (or (progn '#\- (constantly -1)) (constantly +1)))
+        (integer-digits (rep (json-digit) 1))
+        (decimal-digits (opt (progn '#\. (cut (rep (json-digit) 1)))))
+        (exponent (opt (progn (or '#\E '#\e) (cut (json-integer))))))
+    (declare (type (integer -1 +1) sign) (type (or fixnum null) exponent))
+    (cond
+      (exponent (* (digits-float integer-digits decimal-digits) (expt 10.0 exponent) sign))
+      (decimal-digits (* (digits-float integer-digits decimal-digits) sign))
+      (t (* (digits-integer integer-digits) sign)))))
 
 (defparser json-string-escape-char ()
   (or (progn '#\n (constantly #\Newline))
