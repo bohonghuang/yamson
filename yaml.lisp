@@ -2,11 +2,13 @@
 
 (defparser yaml-indent (min &optional (max most-positive-fixnum))
   (for ((spaces (rep '#\Space min max)))
-    (length (the list spaces))))
+    (declare (type list spaces))
+    (length spaces)))
 
 (defparser yaml-whitespaces (&optional (min 0) (max most-positive-fixnum))
   (for ((spaces (rep '#\Space min max)))
-    (length (the list spaces))))
+    (declare (type list spaces))
+    (length spaces)))
 
 (declaim (ftype (function (character) (values boolean)) yaml-newline-char-p)
          (inline yaml-newline-char-p))
@@ -43,7 +45,8 @@
 
 (defparser yaml-identifier ()
   (for ((identifier (rep (satisfies #'yaml-identifier-char-p) 1)))
-    (coerce (the list identifier) 'string)))
+    (declare (type list identifier))
+    (coerce identifier 'string)))
 
 (defparser yaml-array (level)
   (for ((elems (repsep
@@ -58,19 +61,16 @@
         (- (+ spaces level)))))
 
 (defparser yaml-value (level &optional array-element-p)
-  (funcall
-   (lambda (level)
-     (declare (type fixnum level))
-     (parser (or (json-value)
-                 (funcall
-                  (lambda ()
-                    (if (minusp level)
-                        (if array-element-p
-                            (parser (yaml-object (- level)))
-                            (parser (or)))
-                        (parser (or (yaml-array level) (yaml-object level))))))
-                 (constantly nil))))
-   (yaml-mixed-indent (1+ level))))
+  (let ((level (yaml-mixed-indent (1+ level))))
+    (declare (type fixnum level))
+    (or (json-value)
+        ((lambda ()
+           (if (minusp level)
+               (if array-element-p
+                   (parser (yaml-object (- level)))
+                   (parser (or)))
+               (parser (or (yaml-array level) (yaml-object level))))))
+        (constantly nil))))
 
 (defparser yaml-field (level)
   (for ((key (yaml-identifier))
@@ -83,8 +83,7 @@
     (copy-list fields)))
 
 (defparser yaml-file (&optional junk-allowed)
-  (funcall
-   (lambda (result)
+  ((lambda (result)
      (if junk-allowed
          (parser (constantly result))
          (parser (prog1 (constantly result) (rep (yaml-newline)) (yaml-eol) (eof)))))

@@ -55,7 +55,8 @@
   (for ((characters (prog2 '#\"
                         (rep (or (progn '#\\ (cut (json-string-escape-char))) (satisfies (lambda (x) (not (eql x #\"))))))
                       (cut '#\"))))
-    (coerce (the list characters) 'string)))
+    (declare (type list characters))
+    (coerce characters 'string)))
 
 (defparser json-whitespace ()
   (rep (or '#\Space '#\Tab '#\Return '#\Newline) 0))
