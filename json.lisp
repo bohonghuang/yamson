@@ -34,8 +34,8 @@
 (defparser json-number ()
   (for ((sign (or (progn '#\- (constantly -1)) (constantly +1)))
         (integer-digits (rep (json-digit) 1))
-        (decimal-digits (opt (progn '#\. (cut (rep (json-digit) 1)))))
-        (exponent (opt (progn (or '#\E '#\e) (cut (json-integer))))))
+        (decimal-digits (opt (progn '#\. (rep (json-digit) 1))))
+        (exponent (opt (progn (or '#\E '#\e) (json-integer)))))
     (declare (type (integer -1 +1) sign) (type (or fixnum null) exponent))
     (cond
       (exponent (* (digits-float integer-digits decimal-digits) (expt 10.0 exponent) sign))

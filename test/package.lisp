@@ -68,6 +68,30 @@ world" (parse "\"hello\\nworld\""))
   (is equal '(("key" . t)) (parse "key: true"))
   (is equal '(("key" . :null)) (parse "key: null")))
 
+(define-test yaml-unquoted-string :parent suite
+  (is string= "hello" (parse "hello"))
+  (is string= "hello world" (parse "hello world")))
+
+(define-test yaml-single-quoted-string :parent suite
+  (is string= "hello" (parse "'hello'"))
+  (is string= "hello world" (parse "'hello world'"))
+  (is string= "hello'world" (parse "'hello''world'"))
+  (is string= "hello\\nworld" (parse "'hello\\nworld'")))
+
+(define-test yaml-boolean :parent suite
+  (is eq t (parse "true"))
+  (is eq t (parse "yes"))
+  (is eq t (parse "Yes"))
+  (is eq t (parse "YES"))
+  (is eq t (parse "True"))
+  (is eq t (parse "TRUE"))
+  (is eq nil (parse "false"))
+  (is eq nil (parse "no"))
+  (is eq nil (parse "No"))
+  (is eq nil (parse "NO"))
+  (is eq nil (parse "False"))
+  (is eq nil (parse "FALSE")))
+
 (define-test yaml-json-mix :parent suite
   (is equal '(("key" . (1 2 3))) (parse "key: [1, 2, 3]"))
   (is equal '(("key" . (("subkey" . "subvalue")))) (parse "key: {\"subkey\": \"subvalue\"}")))
