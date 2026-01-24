@@ -86,9 +86,31 @@ world" (parse "\"hello\\nworld\""))
   (is eq nil (parse "False"))
   (is eq nil (parse "FALSE")))
 
-(define-test yaml-json-mix :parent suite
-  (is equal '(("key" . (1 2 3))) (parse "key: [1, 2, 3]"))
-  (is equal '(("key" . (("subkey" . "subvalue")))) (parse "key: {\"subkey\": \"subvalue\"}")))
+(define-test yaml-flow :parent suite)
+
+(define-test yaml-flow-sequence :parent yaml-flow
+  (is equal '(1 2 3) (parse "[1, 2, 3]"))
+  (is equal '("a" "b" "c") (parse "[\"a\", \"b\", \"c\"]"))
+  (is equal '(1 "two" 3.0) (parse "[1, \"two\", 3.0]"))
+  (is equal '((("key" . "value"))) (parse "[{key: \"value\"}]"))
+  (is equal '((1 2) (3 4)) (parse "[[1, 2], [3, 4]]"))
+  (is equal '((1 2) (3 4)) (parse "[[1, 2], [3, 4]]"))
+  (is equal '() (parse "[]"))
+  (is equal '(:null) (parse "[,]"))
+  (is equal '(:null :null) (parse "[,,]"))
+  (is equal '(("a" . "d") ("b" . "d")) (parse "[a: d,b: d]"))
+  (is equal '(("seq" . (("a" . 1) ("b" . 2) ("c" . 3) ("d" . :null)))) (parse "seq: [a: 1,b: 2, c: 3,d:]")))
+
+(define-test yaml-flow-mapping :parent yaml-flow
+  (is equal '(("key" . "value")) (parse "{key: \"value\"}"))
+  (is equal '(("key1" . "value1") ("key2" . "value2")) (parse "{key1: \"value1\", key2: \"value2\"}"))
+  (is equal '(("key1" . 1) ("key2" . 2.0)) (parse "{key1: 1, key2: 2.0}"))
+  (is equal '(("key" . (1 2 3))) (parse "{key: [1, 2, 3]}"))
+  (is equal '(("outer" . (("inner" . "value")))) (parse "{outer: {inner: \"value\"}}"))
+  (is equal '() (parse "{}"))
+  (is equal '((:null . :null)) (parse "{,}"))
+  (is equal '(("a" . :null) ("b" . :null) ("c" . "d")) (parse "{a,b, c: d}"))
+  (is equal '(("key" . (("a" . :null) ("b" . :null) ("c" . :null)))) (parse "key: {a,b,c}")))
 
 (define-test yaml-nested :parent suite
   (is equal '(("key1" . "value1") ("key2" . (("subkey" . "subvalue")))) 
@@ -108,12 +130,6 @@ key2:
     age: 25"))
   (is equal '(("users" . ((("name" . "Alice") ("age" . 30)) (("name" . "Bob") ("age" . 25)))))
       (parse "users: [{name: Alice, age: 30}, {name: Bob, age: 25}]")))
-
-(define-test yaml-set-and-seq-shorthand :parent suite
-  (is equal '(("a" . "d") ("b" . "d")) (parse "[a: d,b: d]"))
-  (is equal '(("a" . :null) ("b" . :null) ("c" . "d")) (parse "{a,b, c: d}"))
-  (is equal '(("key" . (("a" . :null) ("b" . :null) ("c" . :null)))) (parse "key: {a,b,c}"))
-  (is equal '(("seq" . (("a" . 1) ("b" . 2) ("c" . 3) ("d" . :null)))) (parse "seq: [a: 1,b: 2, c: 3,d:]")))
 
 (define-test yaml-comment :parent suite
   (is equal '(("key" . "value")) (parse "# This is a comment

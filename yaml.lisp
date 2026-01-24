@@ -78,31 +78,43 @@
 (defparser yaml-flow-trim (parser)
   (prog2 (yaml-flow-whitespaces) parser (yaml-flow-whitespaces)))
 
+(defparser yaml-flow-brackets ()
+  (or '#\{ '#\[ '#\] '#\}))
+
 (defparser yaml-flow-object-terminator ()
-  (or #1=(or '#\{ '#\[ '#\, '#\] '#\}) (prog1 '#\: (peek (or (yaml-newline) (yaml-whitespaces 1) #1#)))))
+  (or #1=(or (yaml-flow-brackets) '#\,) (prog1 '#\: (peek (or (yaml-newline) (yaml-whitespaces 1) #1#)))))
 
 (defparser yaml-flow-unquoted-string ()
   (yaml-unquoted-string (yaml-flow-object-terminator)))
 
-(defparser yaml-flow-value ()
+(defparser yaml-flow-value (&optional value-required-p)
   (yaml-flow-whitespaces)
   (or (prog1 (yaml-value-unquoted)
         (yaml-flow-whitespaces)
         (peek (yaml-flow-object-terminator)))
-      (prog1 (or (yaml-value-quoted) (yaml-flow-unquoted-string) (constantly :null))
-        (yaml-flow-whitespaces))))
+      (prog1 (or (yaml-value-quoted) (yaml-flow-unquoted-string))
+        (yaml-flow-whitespaces))
+      (prog1 (constantly :null)
+        (yaml-flow-whitespaces)
+        (rep (not (yaml-flow-brackets)) (if value-required-p 0 1) 1))))
 
 (defparser yaml-flow-mapping-element (&optional sequence-element-p)
   (for ((key (yaml-flow-value))
-        (value (or (progn '#\: (yaml-flow-value)) (constantly #1='#:null))))
+        (value (or (progn '#\: (yaml-flow-value t)) (constantly #1='#:null))))
     (if (eq value #1#) (if sequence-element-p key (cons key :null)) (cons key value))))
 
 (defparser yaml-flow-sequence ()
-  (for ((list (prog2 '#\[ (repsep (yaml-flow-mapping-element t) '#\,) '#\])))
+  (for ((list (prog2 '#\[
+                  (repsep (yaml-flow-mapping-element t) '#\,)
+                (opt (progn '#\, (yaml-flow-whitespaces)))
+                (cut '#\]))))
     (copy-list list)))
 
 (defparser yaml-flow-mapping ()
-  (for ((alist (prog2 '#\{ (repsep (yaml-flow-mapping-element nil) '#\,) (cut '#\}))))
+  (for ((alist (prog2 '#\{
+                   (repsep (yaml-flow-mapping-element nil) '#\,)
+                 (opt (progn '#\, (yaml-flow-whitespaces)))
+                 (cut '#\}))))
     (copy-list alist)))
 
 (defparser yaml-null ()
