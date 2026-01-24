@@ -89,6 +89,10 @@ world" (parse "\"hello\\nworld\""))
   (is eq nil (parse "False"))
   (is eq nil (parse "FALSE")))
 
+(define-test yaml-null :parent suite
+  (is eq :null (parse "null"))
+  (is eq :null (parse "~")))
+
 (define-test yaml-flow :parent suite)
 
 (define-test yaml-flow-sequence :parent yaml-flow
