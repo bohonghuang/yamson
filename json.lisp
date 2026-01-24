@@ -53,7 +53,7 @@
 
 (defparser json-string ()
   (for ((characters (prog2 '#\"
-                        (rep (or (progn '#\\ (cut (json-string-escape-char))) (satisfies (lambda (x) (not (eql x #\"))))))
+                        (rep (or (progn '#\\ (cut (json-string-escape-char))) (satisfies (lambda (x) (not (char= x #\"))))))
                       (cut '#\"))))
     (declare (type list characters))
     (coerce characters 'string)))

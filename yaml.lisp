@@ -19,7 +19,7 @@
   (satisfies #'yaml-newline-char-p))
 
 (defparser yaml-comment ()
-  (for ((comment (progn '#\# (rep (satisfies (complement #'yaml-newline-char-p))))))
+  (for ((comment (progn '#\# (rep (satisfies (lambda (x) (not (yaml-newline-char-p x))))))))
     (coerce comment 'string)))
 
 (defparser yaml-eol ()
@@ -38,12 +38,25 @@
     (rep (yaml-newline) 1)
     (yaml-indent min max)))
 
+(defparser yaml-after-indicator ()
+  (peek (or (yaml-newline) (yaml-whitespaces 1) (yaml-flow-brackets) (eof) '#\,)))
+
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep
-                (progn '#\- (yaml-value level t))
+                (progn '#\- (yaml-after-indicator) (yaml-value level t))
                 (yaml-newline-indent level level)
                 1)))
     (copy-list elems)))
+
+(defparser yaml-block-mapping-element (level)
+  (for ((key (yaml-unquoted-string '#\:))
+        (nil (progn '#\: (yaml-after-indicator)))
+        (value (yaml-value level)))
+    (cons key value)))
+
+(defparser yaml-block-mapping (level)
+  (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
+    (copy-list fields)))
 
 (defparser yaml-mixed-indent (level)
   (or (yaml-newline-indent level)
@@ -51,15 +64,19 @@
         (- (+ spaces level)))))
 
 (defparser yaml-single-quoted-string ()
-  (for ((characters (prog2 '#\' (rep (or (progn '#\' '#\') (satisfies (lambda (x) (not (eql x #\')))))) (cut '#\'))))
+  (for ((characters (prog2 '#\' (rep (or (progn '#\' '#\') (satisfies (lambda (x) (not (char= x #\')))))) (cut '#\'))))
     (declare (type list characters))
     (coerce characters 'string)))
 
 (defparser yaml-double-quoted-string ()
   (json-string))
 
+(defparser yaml-unquoted-string-character (terminator)
+  (and (not (progn (yaml-eol) (or (yaml-newline-char) (eof) terminator))) (satisfies #'characterp)))
+
 (defparser yaml-unquoted-string (&optional (terminator (or)))
-  (for ((characters (rep (and (not (progn (yaml-eol) (or (yaml-newline-char) (eof) terminator))) (satisfies #'characterp)) 1)))
+  (for ((characters (cons (and (not (yaml-after-indicator)) (yaml-unquoted-string-character terminator))
+                          (rep (yaml-unquoted-string-character terminator)))))
     (declare (type list characters))
     (coerce characters 'string)))
 
@@ -82,7 +99,7 @@
   (or '#\{ '#\[ '#\] '#\}))
 
 (defparser yaml-flow-object-terminator ()
-  (or #1=(or (yaml-flow-brackets) '#\,) (prog1 '#\: (peek (or (yaml-newline) (yaml-whitespaces 1) #1#)))))
+  (or (yaml-flow-brackets) '#\, (prog1 '#\: (yaml-after-indicator))))
 
 (defparser yaml-flow-unquoted-string ()
   (yaml-unquoted-string (yaml-flow-object-terminator)))
@@ -140,17 +157,7 @@
                    (parser (yaml-block-mapping (- level)))
                    (parser (or)))
                (parser (or (yaml-block-sequence level) (yaml-block-mapping level))))))
-        (yaml-unquoted-string) (constantly nil))))
-
-(defparser yaml-block-mapping-element (level)
-  (for ((key (yaml-unquoted-string '#\:))
-        (nil '#\:)
-        (value (yaml-value level)))
-    (cons key value)))
-
-(defparser yaml-block-mapping (level)
-  (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
-    (copy-list fields)))
+        (yaml-unquoted-string) (constantly :null))))
 
 (defparser yaml-file (&optional junk-allowed)
   ((lambda (result)
