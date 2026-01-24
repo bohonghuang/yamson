@@ -80,15 +80,9 @@ world" (parse "\"hello\\nworld\""))
 
 (define-test yaml-boolean :parent suite
   (is eq t (parse "true"))
-  (is eq t (parse "yes"))
-  (is eq t (parse "Yes"))
-  (is eq t (parse "YES"))
   (is eq t (parse "True"))
   (is eq t (parse "TRUE"))
   (is eq nil (parse "false"))
-  (is eq nil (parse "no"))
-  (is eq nil (parse "No"))
-  (is eq nil (parse "NO"))
   (is eq nil (parse "False"))
   (is eq nil (parse "FALSE")))
 
@@ -98,9 +92,9 @@ world" (parse "\"hello\\nworld\""))
 
 (define-test yaml-nested :parent suite
   (is equal '(("key1" . "value1") ("key2" . (("subkey" . "subvalue")))) 
-      (parse "key1: \"value1\"
+      (parse "key1: value1
 key2:
-  subkey: \"subvalue\""))
+  subkey: subvalue"))
   (is equal '(("array" . (1 2 3))) 
       (parse "array:
   - 1
@@ -108,17 +102,26 @@ key2:
   - 3"))
   (is equal '(("users" . ((("name" . "Alice") ("age" . 30)) (("name" . "Bob") ("age" . 25)))))
       (parse "users:
-  - name: \"Alice\"
+  - name: Alice
     age: 30
-  - name: \"Bob\"
+  - name: Bob
     age: 25"))
   (is equal '(("users" . ((("name" . "Alice") ("age" . 30)) (("name" . "Bob") ("age" . 25)))))
-      (parse "users: [{\"name\": \"Alice\", \"age\": 30}, {\"name\": \"Bob\", \"age\": 25}]")))
+      (parse "users: [{name: Alice, age: 30}, {name: Bob, age: 25}]")))
+
+(define-test yaml-set-and-seq-shorthand :parent suite
+  (is equal '(("a" . "d") ("b" . "d")) (parse "[a: d,b: d]"))
+  (is equal '(("a" . :null) ("b" . :null) ("c" . "d")) (parse "{a,b, c: d}"))
+  (is equal '(("key" . (("a" . :null) ("b" . :null) ("c" . :null)))) (parse "key: {a,b,c}"))
+  (is equal '(("seq" . (("a" . 1) ("b" . 2) ("c" . 3) ("d" . :null)))) (parse "seq: [a: 1,b: 2, c: 3,d:]")))
 
 (define-test yaml-comment :parent suite
   (is equal '(("key" . "value")) (parse "# This is a comment
-key: \"value\" # This is another comment"))
+key: value # This is another comment"))
   (is equal '(("key1" . "value1") ("key2" . "value2")) 
-      (parse "key1: \"value1\" # Comment after key1
+      (parse "key1: value1 # Comment after key1
 # This is a full line comment
-key2: \"value2\"")))
+key2: value2"))
+  (is equal '(("key" . (("subkey" . "subvalue")))) 
+      (parse "key: {\"subkey\": \"subvalue\" # This is a comment
+}")))

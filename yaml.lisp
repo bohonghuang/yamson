@@ -65,36 +65,58 @@
 
 (defparser yaml-boolean ()
   (or (json-boolean)
-      (progn (or '"yes" '"Yes" '"YES" '"True" '"TRUE") (constantly t))
-      (progn (or '"no" '"No" '"NO" '"False" '"FALSE") (constantly nil))))
+      (progn (or'"True" '"TRUE") (constantly t))
+      (progn (or'"False" '"FALSE") (constantly nil))))
 
 (defparser yaml-number ()
   (json-number))
 
+(defparser yaml-flow-whitespaces ()
+  (rep (yaml-newline) 0)
+  (yaml-whitespaces))
+
+(defparser yaml-flow-trim (parser)
+  (prog2 (yaml-flow-whitespaces) parser (yaml-flow-whitespaces)))
+
+(defparser yaml-flow-object-terminator ()
+  (or #1=(or '#\{ '#\[ '#\, '#\] '#\}) (prog1 '#\: (peek (or (yaml-newline) (yaml-whitespaces 1) #1#)))))
+
 (defparser yaml-flow-unquoted-string ()
-  (yaml-unquoted-string (or '#\{ '#\[ '#\, '#\: '#\] '#\})))
+  (yaml-unquoted-string (yaml-flow-object-terminator)))
+
+(defparser yaml-flow-value ()
+  (yaml-flow-whitespaces)
+  (or (prog1 (yaml-value-unquoted)
+        (yaml-flow-whitespaces)
+        (peek (yaml-flow-object-terminator)))
+      (prog1 (or (yaml-value-quoted) (yaml-flow-unquoted-string) (constantly :null))
+        (yaml-flow-whitespaces))))
+
+(defparser yaml-flow-mapping-element (&optional sequence-element-p)
+  (for ((key (yaml-flow-value))
+        (value (or (progn '#\: (yaml-flow-value)) (constantly #1='#:null))))
+    (if (eq value #1#) (if sequence-element-p key (cons key :null)) (cons key value))))
 
 (defparser yaml-flow-sequence ()
-  (for ((list (prog2 '#\[ (opt (cons #1=(json-trim (or (yaml-value-simple) (yaml-flow-unquoted-string))) (rep (progn '#\, (cut #1#))))) (cut '#\]))))
+  (for ((list (prog2 '#\[ (repsep (yaml-flow-mapping-element t) '#\,) '#\])))
     (copy-list list)))
 
-(defparser yaml-flow-mapping-element ()
-  (for ((key (json-trim (or (yaml-value-simple) (yaml-flow-unquoted-string))))
-        (nil (cut '#\:))
-        (value (json-trim (or (yaml-value-simple) (yaml-flow-unquoted-string)))))
-    (cons key value)))
-
 (defparser yaml-flow-mapping ()
-  (for ((alist (prog2 '#\{ (opt (cons #1=(yaml-flow-mapping-element) (rep (progn '#\, (cut #1#))))) (cut '#\}))))
+  (for ((alist (prog2 '#\{ (repsep (yaml-flow-mapping-element nil) '#\,) (cut '#\}))))
     (copy-list alist)))
 
 (defparser yaml-null ()
   (json-null))
 
-(defparser yaml-value-simple ()
-  (or (yaml-boolean) (yaml-number) (yaml-null)
-      (yaml-single-quoted-string) (yaml-double-quoted-string)
+(defparser yaml-value-unquoted ()
+  (or (yaml-boolean) (yaml-number) (yaml-null)))
+
+(defparser yaml-value-quoted ()
+  (or (yaml-single-quoted-string) (yaml-double-quoted-string)
       (yaml-flow-sequence) (yaml-flow-mapping)))
+
+(defparser yaml-value-simple ()
+  (or (yaml-value-unquoted) (yaml-value-quoted)))
 
 (defparser yaml-value (level &optional block-sequence-element-p)
   (let ((level (yaml-mixed-indent (1+ level))))
