@@ -68,7 +68,9 @@ world" (parse "\"hello\\nworld\""))
   (is equal '(("key" . t)) (parse "key: true"))
   (is equal '(("key" . :null)) (parse "key: null")))
 
-(define-test yaml-unquoted-string :parent suite
+(define-test yaml-string :parent suite)
+
+(define-test yaml-unquoted-string :parent yaml-string
   (is string= "hello" (parse "hello"))
   (is string= "hello world" (parse "hello world"))
   (is string= "hello:world" (parse "hello:world"))
@@ -76,11 +78,64 @@ world" (parse "\"hello\\nworld\""))
   (is string= "hello:world" (parse "hello:world"))
   (is string= "hello#world" (parse "hello#world")))
 
-(define-test yaml-single-quoted-string :parent suite
+(define-test yaml-single-quoted-string :parent yaml-string
   (is string= "hello" (parse "'hello'"))
   (is string= "hello world" (parse "'hello world'"))
   (is string= "hello'world" (parse "'hello''world'"))
   (is string= "hello\\nworld" (parse "'hello\\nworld'")))
+
+(define-test yaml-string-multiline :parent yaml-string)
+
+(define-test yaml-string-multiline-literal :parent yaml-string-multiline
+  (is string= "hello
+ world
+" (parse "| # Comment
+hello
+ world"))
+  (is string= "
+hello
+world" (parse "|-
+
+ hello
+ world"))
+  (is string= "
+hello
+ 
+world
+
+ !
+
+" (parse "|+
+
+    hello
+     
+    world
+
+     !
+
+"))
+  (is string= "" (parse "|-"))
+  (is equal '("" "") (parse "- |-
+- |-")))
+
+(define-test yaml-string-multiline-folded :parent yaml-string-multiline
+  (is string= "hello world
+" (parse "> # Comment
+  hello
+  world"))
+  (is string= "hello world" (parse ">-
+  hello
+  world"))
+  (is string= "hello world
+ !
+
+" (parse ">+
+   hello
+   world
+
+    !
+
+")))
 
 (define-test yaml-boolean :parent suite
   (is eq t (parse "true"))

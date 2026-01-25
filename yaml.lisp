@@ -85,6 +85,73 @@
     (declare (type list characters))
     (coerce characters 'string)))
 
+(declaim (ftype (function (list t character &optional list) (values string)) yaml-string-multiline-impl))
+(defun yaml-string-multiline-impl (characters-list option separator &optional leading)
+  (if characters-list
+      (loop :with string := (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)
+            :and characters-all := nil
+            :initially (loop :for character :in leading :do (vector-push-extend character string))
+            :for characters-list-cons-previous := nil :then characters-list-cons
+            :for characters-list-cons :on characters-list
+            :for (characters . (characters-next)) := characters-list-cons
+            :do (loop :for character-cons-previous := nil :then character-cons
+                      :for character-cons :on (or characters (return))
+                      :for (character) := character-cons
+                      :do (vector-push-extend character string)
+                      :finally (setf (cdr character-cons-previous) characters-all
+                                     characters-all characters))
+                (when (or (char= separator #\Newline) (or characters (null characters-next)))
+                  (vector-push-extend (if (and characters characters-next) separator #\Newline) string))
+            :finally
+               (vector-pop string)
+               (unless (eql option #\+)
+                 (loop :for character :of-type character := (vector-pop string)
+                       :unless (char= character #\Newline)
+                         :return (vector-push character string)
+                       :until (zerop (length string))))
+               (unless (eql option #\-)
+                 (vector-push #\Newline string))
+               (setf (cdr characters-list-cons-previous) characters-all)
+               (return string))
+      ""))
+
+(defparser yaml-string-multiline-line ()
+  (for ((characters (rep (satisfies (lambda (x) (not (yaml-newline-char-p x)))))))
+    (copy-list characters)))
+
+(defparser yaml-string-multiline-content (level separator)
+  (let ((option (opt (or '#\+ '#\-)))
+        (nil (yaml-eol))
+        (leading (rep (prog2 (yaml-newline-char)
+                          (yaml-whitespaces)
+                        (peek (yaml-newline-char))))))
+    (or (let ((nil (yaml-newline-char))
+              (level (yaml-indent (max level (loop :for cons :on (or leading (return most-negative-fixnum))
+                                                   :for indent :of-type non-negative-fixnum := (car cons)
+                                                   :do (setf (car cons) #\Newline)
+                                                   :maximize indent :of-type fixnum)))))
+          (for ((characters-list (opt (cons (yaml-string-multiline-line)
+                                            (rep (progn
+                                                   (yaml-newline-char)
+                                                   (or (progn
+                                                         (yaml-indent level level)
+                                                         (yaml-string-multiline-line))
+                                                       (progn
+                                                         (yaml-whitespaces)
+                                                         (peek (yaml-newline-char))
+                                                         (constantly nil)))))))))
+            (yaml-string-multiline-impl characters-list option separator leading)))
+        (constantly ""))))
+
+(defparser yaml-string-multiline-literal (level)
+  (progn '#\| (yaml-string-multiline-content level #\Newline)))
+
+(defparser yaml-string-multiline-folded (level)
+  (progn '#\> (yaml-string-multiline-content level #\Space)))
+
+(defparser yaml-string-multiline (level)
+  (or (yaml-string-multiline-literal level) (yaml-string-multiline-folded level)))
+
 (defparser yaml-boolean ()
   (or (json-boolean)
       (progn (or'"True" '"TRUE") (constantly t))
@@ -156,6 +223,7 @@
   (let ((level (yaml-mixed-indent (1+ level))))
     (declare (type fixnum level))
     (or (prog1 (yaml-value-simple) (peek (yaml-end-of-simple-value)))
+        (yaml-string-multiline (abs level))
         ((lambda ()
            (if (minusp level)
                (if block-sequence-element-p
