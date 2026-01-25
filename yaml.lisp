@@ -46,7 +46,7 @@
 
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep
-                (progn '#\- (peek (yaml-end-of-indicator)) (yaml-value level t))
+                (progn '#\- (peek (yaml-end-of-indicator)) (yaml-value level))
                 (yaml-newline-indent level level)
                 1)))
     (copy-list elems)))
@@ -64,7 +64,7 @@
 (defparser yaml-mixed-indent (level)
   (or (yaml-newline-indent level)
       (for ((spaces (yaml-whitespaces)))
-        (- (+ spaces level)))))
+        (+ spaces level))))
 
 (defparser yaml-string-single-quoted ()
   (for ((characters (prog2 '#\' (rep (or (progn '#\' '#\') (satisfies (lambda (x) (not (char= x #\')))))) (cut '#\'))))
@@ -219,17 +219,12 @@
 (defparser yaml-value-simple ()
   (or (yaml-value-unquoted) (yaml-value-quoted)))
 
-(defparser yaml-value (level &optional block-sequence-element-p)
+(defparser yaml-value (level)
   (let ((level (yaml-mixed-indent (1+ level))))
-    (declare (type fixnum level))
+    (declare (type non-negative-fixnum level))
     (or (prog1 (yaml-value-simple) (peek (yaml-end-of-simple-value)))
-        (yaml-string-multiline (abs level))
-        ((lambda ()
-           (if (minusp level)
-               (if block-sequence-element-p
-                   (parser (yaml-block-mapping (- level)))
-                   (parser (or)))
-               (parser (or (yaml-block-sequence level) (yaml-block-mapping level))))))
+        (yaml-string-multiline level)
+        (yaml-block-sequence level) (yaml-block-mapping level)
         (yaml-string-unquoted) (constantly :null))))
 
 (defparser yaml-file (&optional junk-allowed)

@@ -185,6 +185,12 @@ key2:
   - 1
   - 2
   - 3"))
+  (is equal '(((1 2) 3) 4) 
+      (parse "
+    - - - 1
+        - 2
+      - 3
+    - 4"))
   (is equal '(("users" . ((("name" . "Alice") ("age" . 30)) (("name" . "Bob") ("age" . 25)))))
       (parse "users:
   - name: Alice
