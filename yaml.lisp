@@ -38,19 +38,22 @@
     (rep (yaml-newline) 1)
     (yaml-indent min max)))
 
-(defparser yaml-after-indicator ()
-  (peek (or (yaml-newline) (yaml-whitespaces 1) (yaml-flow-brackets) (eof) '#\,)))
+(defparser yaml-end-of-simple-value ()
+  (yaml-eol) (or (yaml-newline-char) (eof)))
+
+(defparser yaml-end-of-indicator ()
+  (or (yaml-end-of-simple-value) (yaml-whitespaces 1) (yaml-flow-brackets) '#\,))
 
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep
-                (progn '#\- (yaml-after-indicator) (yaml-value level t))
+                (progn '#\- (peek (yaml-end-of-indicator)) (yaml-value level t))
                 (yaml-newline-indent level level)
                 1)))
     (copy-list elems)))
 
 (defparser yaml-block-mapping-element (level)
   (for ((key (yaml-string-unquoted '#\:))
-        (nil (progn '#\: (yaml-after-indicator)))
+        (nil (progn '#\: (peek (yaml-end-of-indicator))))
         (value (yaml-value level)))
     (cons key value)))
 
@@ -72,10 +75,12 @@
   (json-string))
 
 (defparser yaml-string-unquoted-character (terminator)
-  (and (not (progn (yaml-eol) (or (yaml-newline-char) (eof) terminator))) (satisfies #'characterp)))
+  (and (not (progn (or (progn (yaml-whitespaces 1) (yaml-comment)) (yaml-whitespaces))
+                   (or (yaml-newline-char) (eof) terminator)))
+       (satisfies #'characterp)))
 
 (defparser yaml-string-unquoted (&optional (terminator (or)))
-  (for ((characters (cons (and (not (yaml-after-indicator)) (yaml-string-unquoted-character terminator))
+  (for ((characters (cons (and (not (yaml-end-of-indicator)) (yaml-string-unquoted-character terminator))
                           (rep (yaml-string-unquoted-character terminator)))))
     (declare (type list characters))
     (coerce characters 'string)))
@@ -99,7 +104,7 @@
   (or '#\{ '#\[ '#\] '#\}))
 
 (defparser yaml-flow-object-terminator ()
-  (or (yaml-flow-brackets) '#\, (prog1 '#\: (yaml-after-indicator))))
+  (or (yaml-flow-brackets) '#\, (prog1 '#\: (peek (yaml-end-of-indicator)))))
 
 (defparser yaml-flow-string-unquoted ()
   (yaml-string-unquoted (yaml-flow-object-terminator)))
@@ -150,7 +155,7 @@
 (defparser yaml-value (level &optional block-sequence-element-p)
   (let ((level (yaml-mixed-indent (1+ level))))
     (declare (type fixnum level))
-    (or (prog1 (yaml-value-simple) (peek (progn (yaml-eol) (or (yaml-newline-char) (eof)))))
+    (or (prog1 (yaml-value-simple) (peek (yaml-end-of-simple-value)))
         ((lambda ()
            (if (minusp level)
                (if block-sequence-element-p

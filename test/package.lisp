@@ -73,7 +73,8 @@ world" (parse "\"hello\\nworld\""))
   (is string= "hello world" (parse "hello world"))
   (is string= "hello:world" (parse "hello:world"))
   (is string= "-hello world" (parse "-hello world"))
-  (is string= "hello:world" (parse "hello:world")))
+  (is string= "hello:world" (parse "hello:world"))
+  (is string= "hello#world" (parse "hello#world")))
 
 (define-test yaml-single-quoted-string :parent suite
   (is string= "hello" (parse "'hello'"))
