@@ -89,17 +89,10 @@
 (defun yaml-string-multiline-impl (characters-list option separator &optional leading)
   (if characters-list
       (loop :with string := (make-array 0 :fill-pointer 0 :adjustable t :element-type 'character)
-            :and characters-all := nil
             :initially (loop :for character :in leading :do (vector-push-extend character string))
-            :for characters-list-cons-previous := nil :then characters-list-cons
-            :for characters-list-cons :on characters-list
-            :for (characters . (characters-next)) := characters-list-cons
-            :do (loop :for character-cons-previous := nil :then character-cons
-                      :for character-cons :on (or characters (return))
-                      :for (character) := character-cons
-                      :do (vector-push-extend character string)
-                      :finally (setf (cdr character-cons-previous) characters-all
-                                     characters-all characters))
+            :for (characters . (characters-next)) :on characters-list
+            :do (loop :for character :in (or characters (return))
+                      :do (vector-push-extend character string))
                 (when (or (char= separator #\Newline) (or characters (null characters-next)))
                   (vector-push-extend (if (and characters characters-next) separator #\Newline) string))
             :finally
@@ -111,13 +104,11 @@
                        :until (zerop (length string))))
                (unless (eql option #\-)
                  (vector-push #\Newline string))
-               (setf (cdr characters-list-cons-previous) characters-all)
                (return string))
       ""))
 
 (defparser yaml-string-multiline-line ()
-  (for ((characters (rep (satisfies (lambda (x) (not (yaml-newline-char-p x)))))))
-    (copy-list characters)))
+  (rep (satisfies (lambda (x) (not (yaml-newline-char-p x))))))
 
 (defparser yaml-string-multiline-content (level separator)
   (let ((option (opt (or '#\+ '#\-)))
