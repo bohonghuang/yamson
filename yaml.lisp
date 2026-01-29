@@ -42,7 +42,7 @@
   (rep (yaml-newline)) (yaml-eol) (or (not (yaml-indent level)) (eof)))
 
 (defparser yaml-end-of-indicator ()
-  (or (yaml-newline) (yaml-whitespaces 1) (yaml-flow-brackets) '#\,))
+  (or (progn (yaml-eol) (or (yaml-newline-char) (eof))) (yaml-whitespaces 1) (yaml-flow-brackets) '#\,))
 
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep
