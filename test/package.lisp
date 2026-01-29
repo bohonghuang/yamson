@@ -76,13 +76,37 @@ world" (parse "\"hello\\nworld\""))
   (is string= "hello:world" (parse "hello:world"))
   (is string= "-hello world" (parse "-hello world"))
   (is string= "hello:world" (parse "hello:world"))
-  (is string= "hello#world" (parse "hello#world")))
+  (is string= "hello#world" (parse "hello#world"))
+  (is string= "hello world" (parse "hello
+  world"))
+  (is string= "hello
+world" (parse "hello
+
+    world")))
 
 (define-test yaml-single-quoted-string :parent yaml-string
   (is string= "hello" (parse "'hello'"))
   (is string= "hello world" (parse "'hello world'"))
   (is string= "hello'world" (parse "'hello''world'"))
-  (is string= "hello\\nworld" (parse "'hello\\nworld'")))
+  (is string= "hello\\nworld" (parse "'hello\\nworld'"))
+  (is string= "hello world" (parse "'hello
+ world'"))
+  (is string= "hello
+world" (parse "'hello
+
+  world'")))
+
+(define-test yaml-double-quoted-string :parent yaml-string
+  (is string= "hello" (parse "\"hello\""))
+  (is string= "hello world" (parse "\"hello world\""))
+  (is string= "hello
+world" (parse "\"hello\\nworld\""))
+  (is string= "hello world" (parse "\"hello
+ world\""))
+  (is string= "hello
+world" (parse "\"hello
+
+  world\"")))
 
 (define-test yaml-string-multiline :parent yaml-string)
 
