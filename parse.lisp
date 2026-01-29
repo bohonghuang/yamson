@@ -15,9 +15,10 @@
              (format stream "Parse error at position ~A" (yamson-parse-error-position condition)))))
 
 (defun parse (object &rest args)
-  (multiple-value-bind (result errorp)
-      (etypecase object
-        ((simple-array character (*)) (apply #'parse-string object args)))
-    (if errorp
-        (error 'yamson-parse-error :position result)
-        result)))
+  (multiple-value-call
+      (lambda (result &optional (position nil errorp))
+        (if errorp
+            (error 'yamson-parse-error :position position)
+            result))
+    (etypecase object
+      ((simple-array character (*)) (apply #'parse-string object args)))))
