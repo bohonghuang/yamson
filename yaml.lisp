@@ -54,7 +54,7 @@
 (defparser yaml-block-mapping-element (level)
   (for ((key (yaml-string-unquoted '#\:))
         (nil (progn '#\: (peek (yaml-end-of-indicator))))
-        (value (yaml-value level)))
+        (value (or (progn (yaml-newline-indent level level) (yaml-block-sequence level)) (yaml-value level))))
     (cons key value)))
 
 (defparser yaml-block-mapping (level)

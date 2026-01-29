@@ -209,6 +209,11 @@ key2:
   - 1
   - 2
   - 3"))
+  (is equal '(("array" . (1 2 3)))
+        (parse "array:
+- 1
+- 2
+- 3"))
   (is equal '(((1 2) 3) 4) 
       (parse "
     - - - 1
