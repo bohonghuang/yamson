@@ -273,3 +273,24 @@ key2: value2"))
   (is equal '(("key" . (("subkey" . "subvalue")))) 
       (parse "key: {\"subkey\": \"subvalue\" # This is a comment
 }")))
+
+(define-test yaml-anchor :parent yaml
+  (is equal '(("key" . "value")) (parse "key: &anchor value"))
+  (is equal '(("key1" . "value") ("key2" . "value")) (parse "key1: &anchor value
+key2: *anchor"))
+  (is equal '(("key1" . (("subkey" . "value"))) ("key2" . (("subkey" . "value")))) (parse "key1: &anchor
+  subkey: value
+key2: *anchor"))
+  (is equal '(("users" . ((("name" . "Alice")) (("name" . "Alice"))))) (parse "users:
+- &alice
+  name: Alice
+- *alice"))
+  (is equal '(("key1" . "value1") ("key2" . "value2") ("key3" . "value1")) (parse "key1: &anchor1 value1
+key2: &anchor2 value2
+key3: *anchor1"))
+  (is equal '(("parent" . (("child" . (("grandchild" . "value")))))
+              ("other" . (("child" . (("grandchild" . "value"))))))
+      (parse "parent: &base
+  child:
+    grandchild: value
+other: *base")))
