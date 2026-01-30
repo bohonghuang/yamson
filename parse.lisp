@@ -2,13 +2,15 @@
 
 (defun parse-string (string &key junk-allowed)
   (check-type string (simple-array character (*)))
-  (let ((*yaml-anchors* (make-hash-table :test #'equal)))
-    (funcall
-     (parser-lambda (input)
-       (declare (type (simple-array character (*)) input)
-                (optimize (speed 3) (debug 0) (safety 0)))
-       (yaml-file junk-allowed))
-     string)))
+  (let* ((anchors (make-hash-table :test #'equal))
+         (*yaml-anchors* anchors))
+    (macrolet ((yaml-anchors () 'anchors))
+      (funcall
+       (parser-lambda (input)
+         (declare (type (simple-array character (*)) input)
+                  (optimize (speed 3) (debug 0) (safety 0)))
+         (yaml-file junk-allowed))
+       string))))
 
 (define-condition yamson-parse-error ()
   ((position :initarg :position :reader yamson-parse-error-position))

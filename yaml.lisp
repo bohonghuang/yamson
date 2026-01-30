@@ -47,6 +47,23 @@
   (rep (yaml-newline) 1)
   (yaml-indent min max))
 
+(defvar *yaml-anchors*)
+
+(defun yaml-anchors ()
+  *yaml-anchors*)
+
+(defparser yaml-anchor-id ()
+  (for ((characters (rep (and (not (yaml-flow-object-terminator)) (satisfies (lambda (x) (not (or (yaml-whitespace-char-p x) (yaml-newline-char-p x)))))) 1)))
+    (declare (type list characters))
+    (coerce characters 'string)))
+
+(defparser yaml-anchor ()
+  '#\& (yaml-anchor-id))
+
+(defparser yaml-alias ()
+  (for ((anchor (progn '#\* (yaml-anchor-id))))
+    (ensure-gethash anchor (yaml-anchors) (error "Undefined anchor: ~A" anchor))))
+
 (defparser yaml-end-of-simple-value (&optional (level most-positive-fixnum))
   (or (yaml-newline-char) (yaml-whitespace-char) (eof))
   (rep (yaml-newline)) (not (and (yaml-indent level) (not (yaml-eof)))))
@@ -281,7 +298,7 @@
                       (prog1 (constantly :null)
                         (yaml-flow-whitespaces)
                         (rep (not (yaml-flow-brackets)) (if (or value-required-p anchor) 0 1) 1)))))
-      (when anchor (setf (gethash anchor *yaml-anchors*) result))
+      (when anchor (setf (gethash anchor (yaml-anchors)) result))
       result)))
 
 (defparser yaml-flow-mapping-element (&optional sequence-element-p)
@@ -306,20 +323,6 @@
 (defparser yaml-null ()
   (or (json-null) (progn '#\~ (constantly :null))))
 
-(defvar *yaml-anchors*)
-
-(defparser yaml-anchor-id ()
-  (for ((characters (rep (and (not (yaml-flow-object-terminator)) (satisfies (lambda (x) (not (or (yaml-whitespace-char-p x) (yaml-newline-char-p x)))))) 1)))
-    (declare (type list characters))
-    (coerce characters 'string)))
-
-(defparser yaml-anchor ()
-  '#\& (yaml-anchor-id))
-
-(defparser yaml-alias ()
-  (for ((anchor (progn '#\* (yaml-anchor-id))))
-    (ensure-gethash anchor *yaml-anchors* (error "Undefined anchor: ~A" anchor))))
-
 (defparser yaml-value-unquoted ()
   (or (yaml-boolean) (yaml-number) (yaml-null)))
 
@@ -341,7 +344,7 @@
                         (yaml-string-multiline level)
                         (yaml-block-sequence child-level) (yaml-block-mapping child-level)
                         (yaml-string-unquoted-multiline level) (constantly :null))))
-        (when anchor (setf (gethash anchor *yaml-anchors*) result))
+        (when anchor (setf (gethash anchor (yaml-anchors)) result))
         result))))
 
 (defparser yaml-file (&optional junk-allowed)
