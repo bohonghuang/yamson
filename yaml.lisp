@@ -5,8 +5,11 @@
     (declare (type list spaces))
     (length spaces)))
 
+(defparser yaml-whitespace-char ()
+  '#\Space)
+
 (defparser yaml-whitespaces (&optional (min 0) (max most-positive-fixnum))
-  (for ((spaces (rep '#\Space min max)))
+  (for ((spaces (rep (yaml-whitespace-char) min max)))
     (declare (type list spaces))
     (length spaces)))
 
@@ -23,26 +26,28 @@
     (coerce comment 'string)))
 
 (defparser yaml-eol ()
-  (progn
-    (yaml-whitespaces)
-    (opt (yaml-comment))
-    (constantly nil)))
+  (yaml-whitespaces)
+  (opt (yaml-comment))
+  (constantly nil))
+
+(defparser yaml-eof ()
+  (yaml-eol)
+  (eof))
 
 (defparser yaml-newline ()
-  (progn
-    (yaml-eol)
-    (yaml-newline-char)))
+  (yaml-eol)
+  (yaml-newline-char))
 
 (defparser yaml-newline-indent (min &optional (max most-positive-fixnum))
-  (progn
-    (rep (yaml-newline) 1)
-    (yaml-indent min max)))
+  (rep (yaml-newline) 1)
+  (yaml-indent min max))
 
 (defparser yaml-end-of-simple-value (&optional (level most-positive-fixnum))
-  (rep (yaml-newline)) (yaml-eol) (or (not (yaml-indent level)) (eof)))
+  (or (yaml-newline-char) (yaml-whitespace-char) (eof))
+  (rep (yaml-newline)) (not (and (yaml-indent level) (not (yaml-eof)))))
 
 (defparser yaml-end-of-indicator ()
-  (or (progn (yaml-eol) (or (yaml-newline-char) (eof))) (yaml-whitespaces 1) (yaml-flow-brackets) '#\,))
+  (or (yaml-end-of-simple-value) (yaml-flow-brackets) '#\,))
 
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep
@@ -266,5 +271,5 @@
   ((lambda (result)
      (if junk-allowed
          (parser (constantly result))
-         (parser (prog1 (constantly result) (yaml-end-of-simple-value 0)))))
+         (parser (prog1 (constantly result) (rep (yaml-newline)) (yaml-eof)))))
    (yaml-value -1)))
