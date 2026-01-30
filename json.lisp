@@ -7,11 +7,11 @@
   (for ((digit (satisfies (lambda (char) (<= #.(char-code #\0) (char-code char) #.(char-code #\9))))))
     (- (char-code digit) (char-code #\0))))
 
-(declaim (ftype (function (list) (values non-negative-fixnum)) digits-integer)
+(declaim (ftype (function (list &optional positive-fixnum) (values non-negative-fixnum)) digits-integer)
          (inline digits-integer))
-(defun digits-integer (digits)
-  (loop :for digit :of-type (mod 10) :in digits
-        :for number :of-type non-negative-fixnum := digit :then (+ (the non-negative-fixnum (* number 10)) digit)
+(defun digits-integer (digits &optional (radix 10))
+  (loop :for digit :of-type (mod 16) :in digits
+        :for number :of-type non-negative-fixnum := digit :then (+ (the non-negative-fixnum (* number radix)) digit)
         :finally (return number)))
 
 (defparser json-integer ()
