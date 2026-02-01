@@ -66,23 +66,39 @@
 
 (defparser yaml-end-of-simple-value (&optional (level most-positive-fixnum))
   (or (yaml-newline-char) (yaml-whitespace-char) (eof))
-  (rep (yaml-newline)) (or (yaml-document-indicator) (not (and (yaml-indent level) (not (yaml-eof))))))
+  (rep (yaml-newline)) (or (yaml-document-indicator) (not (and (yaml-indent level) (not (eof))))))
 
 (defparser yaml-end-of-indicator ()
-  (or (yaml-end-of-simple-value) (yaml-flow-brackets) '#\,))
+  (peek (or (yaml-end-of-simple-value) (yaml-flow-brackets) '#\,)))
+
+(defparser yaml-indicator (parser)
+  (prog1 parser (yaml-end-of-indicator)))
+
+(defparser yaml-block-sequence-element (level)
+  (yaml-indicator '#\-)
+  (yaml-value level))
 
 (defparser yaml-block-sequence (level)
-  (for ((elems (repsep
-                (progn '#\- (peek (yaml-end-of-indicator)) (yaml-value level))
-                (yaml-newline-indent level level)
-                1)))
+  (for ((elems (repsep (yaml-block-sequence-element level) (yaml-newline-indent level level) 1)))
     (copy-list elems)))
 
+(defparser yaml-complex-key (level)
+  (yaml-indicator '#\?)
+  (yaml-value level))
+
+(defparser yaml-block-mapping-element-value (level)
+  (or (progn (yaml-newline-indent level level) (yaml-block-sequence level))
+      (yaml-value level)))
+
 (defparser yaml-block-mapping-element (level)
-  (for ((key (yaml-string-unquoted '#\:))
-        (nil (progn '#\: (peek (yaml-end-of-indicator))))
-        (value (or (progn (yaml-newline-indent level level) (yaml-block-sequence level)) (yaml-value level))))
-    (cons key value)))
+  (for ((element (or (cons (yaml-complex-key level)
+                           (or (progn (yaml-newline-indent level level)
+                                      (yaml-indicator '#\:)
+                                      (yaml-block-mapping-element-value level))
+                               (constantly :null)))
+                     (cons (or (yaml-value-simple) (yaml-string-unquoted))
+                           (progn (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
+    (cons (car element) (cdr element))))
 
 (defparser yaml-block-mapping (level)
   (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
@@ -151,8 +167,9 @@
     (yaml-string-multiline-impl characters-list #\+ #\Space nil nil)))
 
 (defparser yaml-string-unquoted-character (terminator)
-  (and (not (progn (or (progn (yaml-whitespaces 1) (yaml-comment)) (yaml-whitespaces))
-                   (or (yaml-newline-char) (eof) terminator)))
+  (and (not (progn
+              (or (progn (yaml-whitespaces 1) (yaml-comment)) (yaml-whitespaces))
+              (or (yaml-indicator '#\:) (yaml-newline-char) (eof) terminator)))
        (satisfies #'characterp)))
 
 (defparser yaml-string-unquoted-line-rest (terminator)
@@ -162,7 +179,7 @@
   (cons (and (not (yaml-end-of-indicator)) (yaml-string-unquoted-character terminator))
         (yaml-string-unquoted-line-rest terminator)))
 
-(defparser yaml-string-unquoted (terminator)
+(defparser yaml-string-unquoted (&optional (terminator (or)))
   (for ((characters (yaml-string-unquoted-line terminator)))
     (declare (type list characters))
     (coerce characters 'string)))
@@ -284,7 +301,7 @@
   (or '#\{ '#\[ '#\] '#\}))
 
 (defparser yaml-flow-object-terminator ()
-  (or (yaml-flow-brackets) '#\, (prog1 '#\: (peek (yaml-end-of-indicator)))))
+  (or (yaml-flow-brackets) '#\, (yaml-indicator '#\:)))
 
 (defparser yaml-flow-string-unquoted ()
   (yaml-string-unquoted (yaml-flow-object-terminator)))
@@ -303,10 +320,21 @@
       (when anchor (setf (gethash anchor (yaml-anchors)) result))
       result)))
 
+(defparser yaml-flow-complex-key ()
+  (yaml-indicator '#\?)
+  (yaml-flow-whitespaces)
+  (or (prog1 (yaml-flow-value) (or (peek (yaml-flow-object-terminator)) (peek '#\:)))
+      (yaml-string-unquoted-multiline 0)))
+
 (defparser yaml-flow-mapping-element (&optional sequence-element-p)
-  (for ((key (yaml-flow-value))
-        (value (or (progn '#\: (yaml-flow-value t)) (constantly #1='#:null))))
-    (if (eq value #1#) (if sequence-element-p key (cons key :null)) (cons key value))))
+  (yaml-flow-whitespaces)
+  (for ((element (or (cons (yaml-flow-complex-key)
+                           (or (progn '#\: (yaml-flow-value t)) (constantly :null)))
+                     (cons (yaml-flow-value)
+                           (or (progn '#\: (yaml-flow-value t)) (constantly #1='#:null))))))
+    (if (eq (cdr element) #1#)
+        (if sequence-element-p (car element) (cons (car element) :null))
+        (cons (car element) (cdr element)))))
 
 (defparser yaml-flow-sequence ()
   (for ((list (prog2 '#\[
@@ -357,17 +385,15 @@
   '"---")
 
 (defparser yaml-document-begin ()
-  (prog2 (yaml-newlines)
-      (yaml-document-begin-indicator)
-    (peek (yaml-end-of-simple-value))))
+  (yaml-newlines)
+  (yaml-indicator (yaml-document-begin-indicator)))
 
 (defparser yaml-document-end-indicator ()
   '"...")
 
 (defparser yaml-document-end ()
-  (prog2 (yaml-newlines)
-      (yaml-document-end-indicator)
-    (peek (yaml-end-of-simple-value))))
+  (yaml-newlines)
+  (yaml-indicator (yaml-document-end-indicator)))
 
 (defparser yaml-document-indicator ()
   (or (yaml-document-begin-indicator) (yaml-document-end-indicator)))

@@ -109,6 +109,7 @@ world" (parse "\"hello\\nworld\""))
   (is string= "hello world" (parse "hello world"))
   (is string= "hello:world" (parse "hello:world"))
   (is string= "-hello world" (parse "-hello world"))
+  (is string= "?hello world" (parse "?hello world"))
   (is string= "hello:world" (parse "hello:world"))
   (is string= "hello#world" (parse "hello#world"))
   (is string= "hello world" (parse "hello
@@ -327,3 +328,26 @@ b: 2
 ...
 %YAML 1.2
 ---" :multiple-documents-p t)))
+
+(define-test yaml-block-complex-key :parent yaml
+  (is equal '(((("key1" . "value1") ("key2" . "value2")) . "result")) (parse "? key1: value1
+  key2: value2
+: result"))
+  (is equal '(((("nested" . (("a" . 1) ("b" . 2)))) . "value")) (parse "? nested:
+    a: 1
+    b: 2
+: value"))
+  (is equal '(((1 2 3) . "sequence key")) (parse "?
+  - 1
+  - 2
+  - 3
+: sequence key"))
+  (is equal '((((1 . "sequence key")) . :null)) (parse "? 1: sequence key"))
+  (is equal '((123 . :null)) (parse "? 123")))
+
+(define-test yaml-flow-complex-key :parent yaml
+  (is equal '(((("a" . 1) ("b" . 2)) . "value")) (parse "{[a: 1, b: 2]: value}"))
+  (is equal '(((1 2) . "value")) (parse "{? [1, 2]: value }"))
+  (is equal '((:null . "value")) (parse "{? : value }"))
+  (is equal '((:null . "value")) (parse "[? : value]"))
+  (is equal '(("foo" . :null) ("bar" . :null)) (parse "{? foo, ? bar}")))
