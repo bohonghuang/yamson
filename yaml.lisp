@@ -52,21 +52,21 @@
 (defun yaml-anchors ()
   *yaml-anchors*)
 
-(defparser yaml-anchor-id ()
+(defparser yaml-identifier ()
   (for ((characters (rep (and (not (yaml-flow-object-terminator)) (satisfies (lambda (x) (not (or (yaml-whitespace-char-p x) (yaml-newline-char-p x)))))) 1)))
     (declare (type list characters))
     (coerce characters 'string)))
 
 (defparser yaml-anchor ()
-  '#\& (yaml-anchor-id))
+  '#\& (yaml-identifier))
 
 (defparser yaml-alias ()
-  (for ((anchor (progn '#\* (yaml-anchor-id))))
+  (for ((anchor (progn '#\* (yaml-identifier))))
     (ensure-gethash anchor (yaml-anchors) (error "Undefined anchor: ~A" anchor))))
 
 (defparser yaml-end-of-simple-value (&optional (level most-positive-fixnum))
   (or (yaml-newline-char) (yaml-whitespace-char) (eof))
-  (rep (yaml-newline)) (not (and (yaml-indent level) (not (yaml-eof)))))
+  (rep (yaml-newline)) (or (yaml-document-indicator) (not (and (yaml-indent level) (not (yaml-eof))))))
 
 (defparser yaml-end-of-indicator ()
   (or (yaml-end-of-simple-value) (yaml-flow-brackets) '#\,))
@@ -171,8 +171,10 @@
   (for ((characters-list (cons (yaml-string-unquoted-line terminator)
                                (rep (progn
                                       (yaml-newline)
-                                      (or (progn (yaml-eol) (peek (yaml-newline-char)) (constantly nil))
-                                          (progn (yaml-indent level) (yaml-string-unquoted-line-rest terminator))))))))
+                                      (and
+                                       (not (yaml-document-indicator))
+                                       (or (progn (yaml-eol) (peek (yaml-newline-char)) (constantly nil))
+                                           (progn (yaml-indent level) (yaml-string-unquoted-line-rest terminator)))))))))
     (yaml-string-multiline-impl characters-list #\- #\Space)))
 
 (defparser yaml-string-multiline-line ()
@@ -347,9 +349,58 @@
         (when anchor (setf (gethash anchor (yaml-anchors)) result))
         result))))
 
+(defparser yaml-newlines (&optional (count 0))
+  (rep (yaml-newline) count)
+  (constantly nil))
+
+(defparser yaml-document-begin-indicator ()
+  '"---")
+
+(defparser yaml-document-begin ()
+  (prog2 (yaml-newlines)
+      (yaml-document-begin-indicator)
+    (peek (yaml-end-of-simple-value))))
+
+(defparser yaml-document-end-indicator ()
+  '"...")
+
+(defparser yaml-document-end ()
+  (prog2 (yaml-newlines)
+      (yaml-document-end-indicator)
+    (peek (yaml-end-of-simple-value))))
+
+(defparser yaml-document-indicator ()
+  (or (yaml-document-begin-indicator) (yaml-document-end-indicator)))
+
+(defparser yaml-directive ()
+  '#\%
+  (for ((name (yaml-identifier))
+        (nil (yaml-whitespaces 1))
+        (value (yaml-string-multiline-line)))
+    (declare (type list value))
+    (cons name (coerce value 'string))))
+
+(defparser yaml-directives ()
+  (rep (progn (yaml-newlines) (yaml-directive))))
+
+(defparser yaml-document (&optional junk-allowed)
+  (opt (prog1 (yaml-directives) (yaml-document-begin)))
+  (let ((result (or (peek (progn
+                            (or (yaml-document-begin) (yaml-document-end))
+                            (constantly :null)))
+                    (yaml-value -1))))
+    (prog1 (constantly result)
+      (yaml-newlines)
+      (rep (or (yaml-eof)
+               (yaml-document-end-indicator)
+               (peek (yaml-document-begin-indicator)))
+           (if junk-allowed 0 1) 1))))
+
+(defparser yaml-documents ()
+  (for ((documents (repsep (yaml-document) (not (yaml-eof)))))
+    (copy-list documents)))
+
 (defparser yaml-file (&optional junk-allowed)
-  ((lambda (result)
-     (if junk-allowed
-         (parser (constantly result))
-         (parser (prog1 (constantly result) (rep (yaml-newline)) (yaml-eof)))))
-   (yaml-value -1)))
+  (let ((result (yaml-documents)))
+    (prog1 (constantly result)
+      (rep (yaml-eof) (if junk-allowed 0 1) 1))))

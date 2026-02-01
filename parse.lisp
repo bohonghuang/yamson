@@ -17,11 +17,12 @@
   (:report (lambda (condition stream)
              (format stream "Parse error at position ~A" (yamson-parse-error-position condition)))))
 
-(defun parse (object &rest args)
+(defun parse (object &rest args &key multiple-documents-p &allow-other-keys)
+  (delete-from-plistf args :multiple-documents-p)
   (multiple-value-call
       (lambda (result &optional (position nil errorp))
         (if errorp
             (error 'yamson-parse-error :position position)
-            result))
+            (if multiple-documents-p result (destructuring-bind (document) result document))))
     (etypecase object
       ((simple-array character (*)) (apply #'parse-string object args)))))

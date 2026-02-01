@@ -298,3 +298,32 @@ other: *base"))
   (is equal '(("key" . ((1 2) (1 2)))) (parse "key: [ &ref [1, 2], *ref ]"))
   (is equal '(1 2 2 1) (parse "[ &a 1, &b 2, *b, *a ]"))
   (is equal '(("mapping" . (("k1" . "v1") ("k2" . "v1")))) (parse "mapping: {\"k1\":&anchor v1,\"k2\":*anchor}")))
+
+(define-test yaml-document :parent yaml
+  (is string= "value" (parse "--- value"))
+  (is equal :null (parse "---"))
+  (is equal :null (parse "---
+..."))
+  (is string= "abc
+" (parse "--- |
+ abc"))
+  (is equal '(("a" . 1)) (parse "%YAML 1.2
+---
+a: 1"))
+  (is equal :null (parse "...")))
+
+(define-test yaml-multiple-documents :parent yaml
+  (is equal '(1 2) (parse "--- 1
+--- 2" :multiple-documents-p t))
+  (is equal '((("a" . 1)) (("b" . 2))) (parse "--- 
+a: 1
+...
+--- 
+b: 2
+..." :multiple-documents-p t))
+  (is equal '(1) (parse "--- 1" :multiple-documents-p t))
+  (is equal '(:null :null) (parse "%YAML 1.2
+---
+...
+%YAML 1.2
+---" :multiple-documents-p t)))
