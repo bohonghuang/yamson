@@ -1,10 +1,5 @@
 (in-package #:yamson)
 
-(defparser yaml-indent (min &optional (max most-positive-fixnum))
-  (for ((spaces (rep '#\Space min max)))
-    (declare (type list spaces))
-    (length spaces)))
-
 (declaim (ftype (function (character) (values boolean)) yaml-whitespace-char-p)
          (inline yaml-whitespace-char-p))
 (defun yaml-whitespace-char-p (char)
@@ -17,6 +12,9 @@
   (for ((spaces (rep (yaml-whitespace-char) min max)))
     (declare (type list spaces))
     (length spaces)))
+
+(defparser yaml-indent (min &optional (max most-positive-fixnum))
+  (yaml-whitespaces min max))
 
 (declaim (ftype (function (character) (values boolean)) yaml-newline-char-p)
          (inline yaml-newline-char-p))
@@ -64,12 +62,27 @@
   (for ((anchor (progn '#\* (yaml-identifier))))
     (ensure-gethash anchor (yaml-anchors) (error "Undefined anchor: ~A" anchor))))
 
-(defparser yaml-end-of-simple-value (&optional (level most-positive-fixnum))
-  (or (yaml-newline-char) (yaml-whitespace-char) (eof))
-  (rep (yaml-newline)) (or (yaml-document-indicator) (not (and (yaml-indent level) (not (eof))))))
+(defparser yaml-end-of-level (level)
+  (let ((level-next (yaml-indent 0)))
+    (rep (yaml-eof) (if (> level-next level) 1 0) 1)
+    (constantly nil)))
+
+(defparser yaml-end-of-value (&optional (level most-positive-fixnum))
+  (or (eof)
+      (progn
+        (yaml-newline-char)
+        (yaml-newlines)
+        (yaml-end-of-level level))
+      (progn
+        (yaml-whitespace-char)
+        (yaml-eol)
+        (or (progn
+              (yaml-newline-char)
+              (yaml-end-of-level level))
+            (eof)))))
 
 (defparser yaml-end-of-indicator ()
-  (peek (or (yaml-end-of-simple-value) (yaml-flow-brackets) '#\,)))
+  (peek (or (yaml-whitespace-char) (yaml-end-of-value) (yaml-flow-brackets) '#\,)))
 
 (defparser yaml-indicator (parser)
   (prog1 parser (yaml-end-of-indicator)))
@@ -97,7 +110,7 @@
                                       (yaml-block-mapping-element-value level))
                                (constantly :null)))
                      (cons (or (yaml-value-simple) (yaml-string-unquoted))
-                           (progn (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
+                           (progn (yaml-whitespaces) (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
     (cons (car element) (cdr element))))
 
 (defparser yaml-block-mapping (level)
@@ -370,7 +383,7 @@
     (let ((child-level (yaml-mixed-indent level))
           (anchor (opt (prog1 (yaml-anchor) (yaml-mixed-indent level)))))
       (declare (type non-negative-fixnum child-level))
-      (for ((result (or (prog1 (yaml-value-simple) (peek (yaml-end-of-simple-value level)))
+      (for ((result (or (prog1 (yaml-value-simple) (peek (yaml-end-of-value level)))
                         (yaml-string-multiline level)
                         (yaml-block-sequence child-level) (yaml-block-mapping child-level)
                         (yaml-string-unquoted-multiline level) (constantly :null))))
@@ -420,10 +433,11 @@
       (rep (or (yaml-eof)
                (yaml-document-end-indicator)
                (peek (yaml-document-begin-indicator)))
-           (if junk-allowed 0 1) 1))))
+           (if junk-allowed 0 1) 1)
+      (yaml-newlines))))
 
 (defparser yaml-documents ()
-  (for ((documents (repsep (yaml-document) (not (yaml-eof)))))
+  (for ((documents (repsep (cut (yaml-document)) (not (yaml-eof)))))
     (copy-list documents)))
 
 (defparser yaml-file (&optional junk-allowed)
