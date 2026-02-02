@@ -42,6 +42,19 @@
       (decimal-digits (* (digits-float integer-digits decimal-digits) sign))
       (t (* (digits-integer integer-digits) sign)))))
 
+(defparser json-digit-16 ()
+  (for ((digit (or (satisfies (lambda (char)
+                                (or (<= #.(char-code #\0) (char-code char) #.(char-code #\9))
+                                    (<= #.(char-code #\a) (char-code char) #.(char-code #\f))
+                                    (<= #.(char-code #\A) (char-code char) #.(char-code #\F))))))))
+    (cond
+      ((<= #.(char-code #\0) (char-code digit) #.(char-code #\9))
+       (- (char-code digit) #.(char-code #\0)))
+      ((<= #.(char-code #\a) (char-code digit) #.(char-code #\f))
+       (+ 10 (- (char-code digit) #.(char-code #\a))))
+      ((<= #.(char-code #\A) (char-code digit) #.(char-code #\F))
+       (+ 10 (- (char-code digit) #.(char-code #\A)))))))
+
 (defparser json-string-escape-char ()
   (or (progn '#\n (constantly #\Newline))
       (progn '#\r (constantly #\Return))
@@ -49,7 +62,10 @@
       (progn '#\b (constantly #\Backspace))
       (progn '#\f (constantly #\Linefeed))
       (progn '#\\ (constantly #\\))
-      (progn '#\" (constantly #\"))))
+      (progn '#\" (constantly #\"))
+      (progn '#\/ (constantly #\/))
+      (progn '#\u (for ((digits (rep (json-digit-16) 4)))
+                    (code-char (digits-integer digits 16))))))
 
 (defparser json-string ()
   (for ((characters (prog2 '#\"

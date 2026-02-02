@@ -36,7 +36,17 @@
   (is string= "hello" (parse "\"hello\""))
   (is string= "hello
 world" (parse "\"hello\\nworld\""))
-  (is string= "hello\"world" (parse "\"hello\\\"world\"")))
+  (is string= "hello\"world" (parse "\"hello\\\"world\""))
+  (is string= "hello\\world" (parse "\"hello\\\\world\""))
+  (is string= "hello
+world" (parse "\"hello\\nworld\""))
+  (is string= "hello	world" (parse "\"hello\\tworld\""))
+  (is string= "helloworld" (parse "\"hello\\rworld\""))
+  (is string= "helloworld" (parse "\"hello\\bworld\""))
+  (is string= "hello
+world" (parse "\"hello\\fworld\""))
+  (is string= "hello/world" (parse "\"hello\\/world\""))
+  (is string= "hello world" (parse "\"hello\\u2005world\"")))
 
 (define-test json-boolean :parent json
   (is eq t (parse "true"))

@@ -266,17 +266,7 @@
     (digits-integer digits 8)))
 
 (defparser yaml-digit-16 ()
-  (for ((digit (or (satisfies (lambda (char)
-                                (or (<= #.(char-code #\0) (char-code char) #.(char-code #\9))
-                                    (<= #.(char-code #\a) (char-code char) #.(char-code #\f))
-                                    (<= #.(char-code #\A) (char-code char) #.(char-code #\F))))))))
-    (cond
-      ((<= #.(char-code #\0) (char-code digit) #.(char-code #\9))
-       (- (char-code digit) #.(char-code #\0)))
-      ((<= #.(char-code #\a) (char-code digit) #.(char-code #\f))
-       (+ 10 (- (char-code digit) #.(char-code #\a))))
-      ((<= #.(char-code #\A) (char-code digit) #.(char-code #\F))
-       (+ 10 (- (char-code digit) #.(char-code #\A)))))))
+  (json-digit-16))
 
 (defparser yaml-integer-16 ()
   (for ((digits (progn '"0x" (rep (progn (rep '#\_) (yaml-digit-16)) 1))))
