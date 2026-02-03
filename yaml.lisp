@@ -93,7 +93,7 @@
 
 (defparser yaml-block-sequence (level)
   (for ((elems (repsep (yaml-block-sequence-element level) (yaml-newline-indent level level) 1)))
-    (copy-list elems)))
+    (construct-sequence elems)))
 
 (defparser yaml-complex-key (level)
   (yaml-indicator '#\?)
@@ -108,14 +108,14 @@
                            (or (progn (yaml-newline-indent level level)
                                       (yaml-indicator '#\:)
                                       (yaml-block-mapping-element-value level))
-                               (constantly :null)))
+                               (constantly (construct-null))))
                      (cons (or (yaml-value-simple) (yaml-string-unquoted))
                            (progn (yaml-whitespaces) (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
     (cons (car element) (cdr element))))
 
 (defparser yaml-block-mapping (level)
   (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
-    (copy-list fields)))
+    (construct-mapping fields)))
 
 (defparser yaml-mixed-indent (level)
   (or (yaml-newline-indent level)
@@ -246,8 +246,8 @@
 
 (defparser yaml-boolean ()
   (or (json-boolean)
-      (progn (or'"True" '"TRUE") (constantly t))
-      (progn (or'"False" '"FALSE") (constantly nil))))
+      (progn (or'"True" '"TRUE") (constantly (construct-boolean t)))
+      (progn (or'"False" '"FALSE") (constantly (construct-boolean nil)))))
 
 (defparser yaml-digit-2 ()
   (for ((digit (or '#\0 '#\1)))
@@ -317,7 +317,7 @@
                         (peek (yaml-flow-object-terminator)))
                       (prog1 (or (yaml-value-quoted) (yaml-flow-string-unquoted))
                         (yaml-flow-whitespaces))
-                      (prog1 (constantly :null)
+                      (prog1 (constantly (construct-null))
                         (yaml-flow-whitespaces)
                         (rep (not (yaml-flow-brackets)) (if (or value-required-p anchor) 0 1) 1)))))
       (when anchor (setf (gethash anchor (yaml-anchors)) result))
@@ -332,11 +332,11 @@
 (defparser yaml-flow-mapping-element (&optional sequence-element-p)
   (yaml-flow-whitespaces)
   (for ((element (or (cons (yaml-flow-complex-key)
-                           (or (progn '#\: (yaml-flow-value t)) (constantly :null)))
+                           (or (progn '#\: (yaml-flow-value t)) (constantly (construct-null))))
                      (cons (yaml-flow-value)
                            (or (progn '#\: (yaml-flow-value t)) (constantly #1='#:null))))))
     (if (eq (cdr element) #1#)
-        (if sequence-element-p (car element) (cons (car element) :null))
+        (if sequence-element-p (car element) (cons (car element) (construct-null)))
         (cons (car element) (cdr element)))))
 
 (defparser yaml-flow-sequence ()
@@ -344,17 +344,17 @@
                   (repsep (yaml-flow-mapping-element t) '#\,)
                 (opt (progn '#\, (yaml-flow-whitespaces)))
                 (cut '#\]))))
-    (copy-list list)))
+    (construct-sequence list)))
 
 (defparser yaml-flow-mapping ()
   (for ((alist (prog2 '#\{
                    (repsep (yaml-flow-mapping-element nil) '#\,)
                  (opt (progn '#\, (yaml-flow-whitespaces)))
                  (cut '#\}))))
-    (copy-list alist)))
+    (construct-mapping alist)))
 
 (defparser yaml-null ()
-  (or (json-null) (progn '#\~ (constantly :null))))
+  (or (json-null) (progn '#\~ (constantly (construct-null)))))
 
 (defparser yaml-value-unquoted ()
   (or (yaml-boolean) (yaml-number) (yaml-null)))
@@ -376,7 +376,7 @@
       (for ((result (or (prog1 (yaml-value-simple) (peek (yaml-end-of-value level)))
                         (yaml-string-multiline level)
                         (yaml-block-sequence child-level) (yaml-block-mapping child-level)
-                        (yaml-string-unquoted-multiline level) (constantly :null))))
+                        (yaml-string-unquoted-multiline level) (constantly (construct-null)))))
         (when anchor (setf (gethash anchor (yaml-anchors)) result))
         result))))
 
@@ -416,7 +416,7 @@
   (opt (prog1 (yaml-directives) (yaml-document-begin)))
   (let ((result (or (peek (progn
                             (or (yaml-document-begin) (yaml-document-end))
-                            (constantly :null)))
+                            (constantly (construct-null))))
                     (yaml-value -1))))
     (prog1 (constantly result)
       (yaml-newlines)

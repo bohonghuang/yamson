@@ -10,6 +10,7 @@
   :depends-on (#:alexandria #:parsonic)
   :serial t
   :components ((:file "package")
+               (:file "construct")
                (:file "json")
                (:file "yaml")
                (:file "parse"))

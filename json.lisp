@@ -1,7 +1,7 @@
 (in-package #:yamson)
 
 (defparser json-boolean ()
-  (or (progn '"true" (constantly t)) (progn '"false" (constantly nil))))
+  (or (progn '"true" (constantly (construct-boolean t))) (progn '"false" (constantly (construct-boolean nil)))))
 
 (defparser json-digit ()
   (for ((digit (satisfies (lambda (char) (<= #.(char-code #\0) (char-code char) #.(char-code #\9))))))
@@ -81,14 +81,14 @@
   (prog2 (json-whitespace) parser (json-whitespace)))
 
 (defparser json-null ()
-  (progn '"null" (constantly :null)))
+  (progn '"null" (constantly (construct-null))))
 
 (defparser json-value ()
   (or (json-boolean) (json-string) (json-number) (json-array) (json-object) (json-null)))
 
 (defparser json-array ()
   (for ((list (prog2 '#\[ (opt (cons #1=(json-trim (json-value)) (rep (progn '#\, (cut #1#))))) (cut '#\]))))
-    (copy-list list)))
+    (construct-sequence list)))
 
 (defparser json-field ()
   (for ((key (json-trim (json-string)))
@@ -98,7 +98,7 @@
 
 (defparser json-object ()
   (for ((alist (prog2 '#\{ (opt (cons #1=(json-field) (rep (progn '#\, (cut #1#))))) (cut '#\}))))
-    (copy-list alist)))
+    (construct-mapping alist)))
 
 (defparser json-file (&optional junk-allowed)
   (let ((result (json-trim (json-value))))
