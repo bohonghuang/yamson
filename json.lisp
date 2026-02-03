@@ -99,3 +99,8 @@
 (defparser json-object ()
   (for ((alist (prog2 '#\{ (opt (cons #1=(json-field) (rep (progn '#\, (cut #1#))))) (cut '#\}))))
     (copy-list alist)))
+
+(defparser json-file (&optional junk-allowed)
+  (let ((result (json-trim (json-value))))
+    (prog1 (constantly result)
+      (rep (eof) (if junk-allowed 0 1) 1))))

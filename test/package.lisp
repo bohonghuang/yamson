@@ -10,68 +10,68 @@
 (define-test json-number :parent json)
 
 (define-test json-integer :parent json-number
-  (is = 123 (parse "123"))
-  (is = -123 (parse "-123")))
+  (is = 123 (parse "123" :subset :json))
+  (is = -123 (parse "-123" :subset :json)))
 
 (define-test json-float :parent json-number
-  (is = 3.1415926 (parse "3.1415926"))
-  (is = -3.1415926 (parse "-3.1415926"))
-  (is = 0.5 (parse "0.5"))
-  (is = -0.5 (parse "-0.5"))
-  (is = 123.0 (parse "123.0")))
+  (is = 3.1415926 (parse "3.1415926" :subset :json))
+  (is = -3.1415926 (parse "-3.1415926" :subset :json))
+  (is = 0.5 (parse "0.5" :subset :json))
+  (is = -0.5 (parse "-0.5" :subset :json))
+  (is = 123.0 (parse "123.0" :subset :json)))
 
 (define-test json-scientific :parent json-number
-  (is = 1.23e-4 (parse "1.23e-4"))
-  (is = -1.23e-4 (parse "-1.23e-4"))
-  (is = 1.23e4 (parse "1.23e4"))
-  (is = -1.23e4 (parse "-1.23e4"))
-  (is = 1.23E-4 (parse "1.23E-4"))
-  (is = -1.23E-4 (parse "-1.23E-4"))
-  (is = 1.23E4 (parse "1.23E4"))
-  (is = -1.23E4 (parse "-1.23E4"))
-  (is = 12300.0 (parse "1.23e4"))
-  (is = 0.000123 (parse "1.23e-4")))
+  (is = 1.23e-4 (parse "1.23e-4" :subset :json))
+  (is = -1.23e-4 (parse "-1.23e-4" :subset :json))
+  (is = 1.23e4 (parse "1.23e4" :subset :json))
+  (is = -1.23e4 (parse "-1.23e4" :subset :json))
+  (is = 1.23E-4 (parse "1.23E-4" :subset :json))
+  (is = -1.23E-4 (parse "-1.23E-4" :subset :json))
+  (is = 1.23E4 (parse "1.23E4" :subset :json))
+  (is = -1.23E4 (parse "-1.23E4" :subset :json))
+  (is = 12300.0 (parse "1.23e4" :subset :json))
+  (is = 0.000123 (parse "1.23e-4" :subset :json)))
 
 (define-test json-string :parent json
-  (is string= "hello" (parse "\"hello\""))
+  (is string= "hello" (parse "\"hello\"" :subset :json))
   (is string= "hello
-world" (parse "\"hello\\nworld\""))
-  (is string= "hello\"world" (parse "\"hello\\\"world\""))
-  (is string= "hello\\world" (parse "\"hello\\\\world\""))
+world" (parse "\"hello\\nworld\"" :subset :json))
+  (is string= "hello\"world" (parse "\"hello\\\"world\"" :subset :json))
+  (is string= "hello\\world" (parse "\"hello\\\\world\"" :subset :json))
   (is string= "hello
-world" (parse "\"hello\\nworld\""))
-  (is string= "hello	world" (parse "\"hello\\tworld\""))
-  (is string= "helloworld" (parse "\"hello\\rworld\""))
-  (is string= "helloworld" (parse "\"hello\\bworld\""))
+world" (parse "\"hello\\nworld\"" :subset :json))
+  (is string= "hello	world" (parse "\"hello\\tworld\"" :subset :json))
+  (is string= "helloworld" (parse "\"hello\\rworld\"" :subset :json))
+  (is string= "helloworld" (parse "\"hello\\bworld\"" :subset :json))
   (is string= "hello
-world" (parse "\"hello\\fworld\""))
-  (is string= "hello/world" (parse "\"hello\\/world\""))
-  (is string= "hello world" (parse "\"hello\\u2005world\"")))
+world" (parse "\"hello\\fworld\"" :subset :json))
+  (is string= "hello/world" (parse "\"hello\\/world\"" :subset :json))
+  (is string= "hello world" (parse "\"hello\\u2005world\"" :subset :json)))
 
 (define-test json-boolean :parent json
-  (is eq t (parse "true"))
-  (is eq nil (parse "false")))
+  (is eq t (parse "true" :subset :json))
+  (is eq nil (parse "false" :subset :json)))
 
 (define-test json-null :parent json
-  (is eq :null (parse "null")))
+  (is eq :null (parse "null" :subset :json)))
 
 (define-test json-array :parent json
-  (is equal '(1 2 3) (parse "[1,2,3]"))
-  (is equal '(1 2 3) (parse "[1, 2, 3]"))
-  (is equal '(1 2 3) (parse "[ 1 , 2 , 3 ]"))
-  (is equal '(1 "hello" t :null) (parse "[1,\"hello\",true,null]")))
+  (is equal '(1 2 3) (parse "[1,2,3]" :subset :json))
+  (is equal '(1 2 3) (parse "[1, 2, 3]" :subset :json))
+  (is equal '(1 2 3) (parse "[ 1 , 2 , 3 ]" :subset :json))
+  (is equal '(1 "hello" t :null) (parse "[1,\"hello\",true,null]" :subset :json)))
 
 (define-test json-object :parent json
-  (is equal '(("key" . "value")) (parse "{\"key\":\"value\"}"))
-  (is equal '(("key1" . "value1") ("key2" . "value2")) (parse "{\"key1\":\"value1\",\"key2\":\"value2\"}"))
-  (is equal '(("key1" . "value1") ("key2" . "value2")) (parse "{\"key1\": \"value1\", \"key2\": \"value2\"}"))
-  (is equal '(("key" . 123)) (parse "{\"key\":123}"))
-  (is equal '(("key" . 123.45)) (parse "{\"key\":123.45}"))
-  (is equal '(("key" . t)) (parse "{\"key\":true}"))
-  (is equal '(("key" . nil)) (parse "{\"key\":false}"))
-  (is equal '(("key" . :null)) (parse "{\"key\":null}"))
-  (is equal '(("key" . (1 2 3))) (parse "{\"key\":[1,2,3]}"))
-  (is equal '(("key1" . "value") ("key2" . 123)) (parse "{\"key1\":\"value\",\"key2\":123}")))
+  (is equal '(("key" . "value")) (parse "{\"key\":\"value\"}" :subset :json))
+  (is equal '(("key1" . "value1") ("key2" . "value2")) (parse "{\"key1\":\"value1\",\"key2\":\"value2\"}" :subset :json))
+  (is equal '(("key1" . "value1") ("key2" . "value2")) (parse "{\"key1\": \"value1\", \"key2\": \"value2\"}" :subset :json))
+  (is equal '(("key" . 123)) (parse "{\"key\":123}" :subset :json))
+  (is equal '(("key" . 123.45)) (parse "{\"key\":123.45}" :subset :json))
+  (is equal '(("key" . t)) (parse "{\"key\":true}" :subset :json))
+  (is equal '(("key" . nil)) (parse "{\"key\":false}" :subset :json))
+  (is equal '(("key" . :null)) (parse "{\"key\":null}" :subset :json))
+  (is equal '(("key" . (1 2 3))) (parse "{\"key\":[1,2,3]}" :subset :json))
+  (is equal '(("key1" . "value") ("key2" . 123)) (parse "{\"key1\":\"value\",\"key2\":123}" :subset :json)))
 
 (define-test yaml :parent suite)
 
