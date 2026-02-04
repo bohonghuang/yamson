@@ -308,7 +308,17 @@ other: *base"))
   (is equal '((("a" . 1)) (("b" . 2) ("c" . (("a" . 1))))) (parse "[&x {a: 1}, {b: 2, c: *x}]"))
   (is equal '(("key" . ((1 2) (1 2)))) (parse "key: [ &ref [1, 2], *ref ]"))
   (is equal '(1 2 2 1) (parse "[ &a 1, &b 2, *b, *a ]"))
-  (is equal '(("mapping" . (("k1" . "v1") ("k2" . "v1")))) (parse "mapping: {\"k1\":&anchor v1,\"k2\":*anchor}")))
+  (is equal '(("mapping" . (("k1" . "v1") ("k2" . "v1")))) (parse "mapping: {\"k1\":&anchor v1,\"k2\":*anchor}"))
+  (is equal '(("key1" . (1 2)) ("key2" . (1 2))) (parse "
+key1: &list
+ - 1
+ - 2
+key2: *list"))
+  (is equal '(("key1" . (1 2)) ("key2" . (1 2))) (parse "
+key1: &list
+        - 1
+        - 2
+key2: *list")))
 
 (define-test yaml-document :parent yaml
   (is string= "value" (parse "--- value"))
