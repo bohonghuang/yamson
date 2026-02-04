@@ -1,0 +1,51 @@
+#+TITLE: Yamson
+
+A high-performance YAML/JSON parser for Common Lisp.
+
+* Introduction
+Yamson aims to comply with YAML 1.2 (only parsing, no serialization,
+but contributions are welcome), while also supporting fast JSON
+parsing in a subset mode.
+
+Currently, Yamson can parse YAML at speeds around 50MB/s and JSON at
+over 100MB/s on Intel® Core™ i7-11700K.
+
+It is still under development, with most YAML 1.2 features supported.
+* Installation
+Yamson and its dependencies are not yet available on Quicklisp. You
+will need to manually clone them into the =local-projects= directory
+under your Quicklisp installation.
+
+Yamson depends on:
+- [[https://github.com/bohonghuang/parsonic][Parsonic]]
+* Usage
+#+BEGIN_SRC lisp
+  CL-USER> (yamson:parse "
+  key:
+  - value1
+  - value2")
+  (("key" "value1" "value2"))
+  CL-USER> (yamson:parse "
+  ---
+  key: [&1 value, *1]
+  ---
+  ..." :multiple-documents-p t)
+  ((("key" "value" "value")) :NULL)
+  CL-USER> (yamson:parse "
+  a: 1
+  b: 2
+  c: 3")
+  (("a" . 1) ("b" . 2) ("c" . 3))
+  CL-USER> (yamson:parse "
+  a: 1
+  b: 2
+  c: 3" :mapping #'alexandria:alist-hash-table)
+  #<HASH-TABLE :TEST EQL :COUNT 3 {1202B6CAD3}>
+  CL-USER> (yamson:parse "
+  - ~
+  - null
+  - " :sequence (lambda (list) (coerce list 'simple-vector)) :null (constantly (vector)))
+  #(#() #() #())
+  CL-USER> (yamson:parse "{\"a\":1} ..." :subset :json :junk-allowed t)
+  (("a" . 1))
+#+END_SRC
