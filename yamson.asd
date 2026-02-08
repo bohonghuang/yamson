@@ -7,13 +7,7 @@
   :homepage "https://github.com/bohonghuang/yamson"
   :bug-tracker "https://github.com/bohonghuang/yamson/issues"
   :source-control (:git "https://github.com/bohonghuang/yamson.git")
-  :depends-on (#:alexandria #:parsonic)
-  :serial t
-  :components ((:file "package")
-               (:file "construct")
-               (:file "json")
-               (:file "yaml")
-               (:file "parse"))
+  :depends-on (#:yamson.json #:yamson.yaml)
   :in-order-to ((test-op (test-op #:yamson/test))))
 
 (defsystem yamson/test

@@ -1,0 +1,20 @@
+(in-package #:yamson)
+
+(defun parse-yaml-string (string &key tags junk-allowed)
+  (check-type string (simple-array character (*)))
+  (let* ((tags (append tags *yaml-tags*))
+         (*yaml-tags* tags)
+         (tag-shorthands (make-hash-table :test #'equal))
+         (*yaml-tag-shorthands* tag-shorthands)
+         (anchors (make-hash-table :test #'equal))
+         (*yaml-anchors* anchors))
+    (macrolet ((yaml-anchors () 'anchors)
+               (yaml-tags () 'tags)
+               (yaml-tag-shorthands () 'tag-shorthands))
+      (with-constructors
+        (funcall
+         (parser-lambda (input)
+           (declare (type (simple-array character (*)) input)
+                    (optimize (speed 3) (debug 0) (safety 0)))
+           (yaml-file junk-allowed))
+         string)))))
