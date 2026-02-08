@@ -228,7 +228,9 @@ world
   (is equal '((1 2) (3 4)) (parse "[[1, 2], [3, 4]]"))
   (is equal '((1 2) (3 4)) (parse "[[1, 2], [3, 4]]"))
   (is equal '() (parse "[]"))
+  (is equal '() (parse "[ ]"))
   (is equal '(:null) (parse "[,]"))
+  (is equal '(:null) (parse "[ , ]"))
   (is equal '(:null :null) (parse "[,,]"))
   (is equal '(("a" . "d") ("b" . "d")) (parse "[a: d,b: d]"))
   (is equal '(("seq" . (("a" . 1) ("b" . 2) ("c" . 3) ("d" . :null)))) (parse "seq: [a: 1,b: 2, c: 3,d:]")))
@@ -240,7 +242,9 @@ world
   (is equal '(("key" . (1 2 3))) (parse "{key: [1, 2, 3]}"))
   (is equal '(("outer" . (("inner" . "value")))) (parse "{outer: {inner: \"value\"}}"))
   (is equal '() (parse "{}"))
+  (is equal '() (parse "{ }"))
   (is equal '((:null . :null)) (parse "{,}"))
+  (is equal '((:null . :null)) (parse "{ , }"))
   (is equal '(("a" . :null) ("b" . :null) ("c" . "d")) (parse "{a,b, c: d}"))
   (is equal '(("key" . (("a" . :null) ("b" . :null) ("c" . :null)))) (parse "key: {a,b,c}")))
 
@@ -371,3 +375,45 @@ b: 2
   (is equal '((:null . "value")) (parse "{? : value }"))
   (is equal '((:null . "value")) (parse "[? : value]"))
   (is equal '(("foo" . :null) ("bar" . :null)) (parse "{? foo, ? bar}")))
+
+(define-test yaml-tag :parent yaml)
+
+(define-test yaml-tag-global :parent yaml-tag
+  (is string= "hello" (parse "!!str hello"))
+  (is string= "123" (parse "!!str 123"))
+  (is = 123 (parse "!!int 123"))
+  (is = 123 (parse "!!int \"123\""))
+  (is = 123.45 (parse "!!float 123.45"))
+  (is = 123.45 (parse "!!float \"123.45\""))
+  (is eq :null (parse "!!null null"))
+  (is equal '(:null) (parse "[!!null]"))
+  (is eq t (parse "!!bool true"))
+  (is eq nil (parse "!!bool false"))
+  (is equal '(1 2 3) (parse "!!seq
+- 1
+- 2
+- 3"))
+  (is equal nil (parse "!!seq []"))
+  (is equal '(("key" . "value")) (parse "!!map
+key: value"))
+  (is equal nil (parse "!!map {}")))
+
+(define-test yaml-tag-local :parent yaml-tag
+  (is eq 'foo (parse "!intern FOO" :tags (list (lambda (tag value)
+                                                 (when (string= tag "intern")
+                                                   (values (intern value #.*package*) t))))))
+  (is equal '(1 2 3) (parse "!list 1 2 3" :tags (list (lambda (tag value)
+                                                        (when (string= tag "list")
+                                                          (values (read-from-string (concatenate 'string "(" value ")")) t)))))))
+
+(define-test yaml-tag-verbatim :parent yaml-tag
+  (is string= "hello" (parse "!<tag:yaml.org,2002:str> hello"))
+  (is = 456 (parse "!<tag:yaml.org,2002:int> \"456\"")))
+
+(define-test yaml-tag-named :parent yaml-tag
+  (is string= "123" (parse "%TAG !yaml!tag:yaml.org,2002:
+---
+!yaml!str 123"))
+  (is equal '(:null) (parse "%TAG !yaml!tag:yaml.org,2002:
+---
+!yaml!seq [!yaml!null]")))

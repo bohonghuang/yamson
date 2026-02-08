@@ -45,23 +45,6 @@
   (rep (yaml-newline) 1)
   (yaml-indent min max))
 
-(defvar *yaml-anchors*)
-
-(defun yaml-anchors ()
-  *yaml-anchors*)
-
-(defparser yaml-identifier ()
-  (for ((characters (rep (and (not (yaml-flow-object-terminator)) (satisfies (lambda (x) (not (or (yaml-whitespace-char-p x) (yaml-newline-char-p x)))))) 1)))
-    (declare (type list characters))
-    (coerce characters 'string)))
-
-(defparser yaml-anchor ()
-  '#\& (yaml-identifier))
-
-(defparser yaml-alias ()
-  (for ((anchor (progn '#\* (yaml-identifier))))
-    (ensure-gethash anchor (yaml-anchors) (error "Undefined anchor: ~A" anchor))))
-
 (defparser yaml-end-of-level (level)
   (let ((level-next (yaml-indent 0)))
     (rep (yaml-eof) (if (> level-next level) 1 0) 1)
@@ -86,36 +69,6 @@
 
 (defparser yaml-indicator (parser)
   (prog1 parser (yaml-end-of-indicator)))
-
-(defparser yaml-block-sequence-element (level)
-  (yaml-indicator '#\-)
-  (yaml-value level))
-
-(defparser yaml-block-sequence (level)
-  (for ((elems (repsep (yaml-block-sequence-element level) (yaml-newline-indent level level) 1)))
-    (construct-sequence elems)))
-
-(defparser yaml-complex-key (level)
-  (yaml-indicator '#\?)
-  (yaml-value level))
-
-(defparser yaml-block-mapping-element-value (level)
-  (or (progn (yaml-newline-indent level level) (yaml-block-sequence level))
-      (yaml-value level)))
-
-(defparser yaml-block-mapping-element (level)
-  (for ((element (or (cons (yaml-complex-key level)
-                           (or (progn (yaml-newline-indent level level)
-                                      (yaml-indicator '#\:)
-                                      (yaml-block-mapping-element-value level))
-                               (constantly (construct-null))))
-                     (cons (or (yaml-value-simple) (yaml-string-unquoted))
-                           (progn (yaml-whitespaces) (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
-    (cons (car element) (cdr element))))
-
-(defparser yaml-block-mapping (level)
-  (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
-    (construct-mapping fields)))
 
 (defparser yaml-mixed-indent (level)
   (or (yaml-newline-indent level)
@@ -294,6 +247,143 @@
       (fixnum (* sign number))
       (single-float (* sign number)))))
 
+(defvar *yaml-anchors*)
+
+(defun yaml-anchors ()
+  *yaml-anchors*)
+
+(defparser yaml-identifier ()
+  (for ((characters (rep (and (not (yaml-flow-object-terminator)) (satisfies (lambda (x) (not (or (yaml-whitespace-char-p x) (yaml-newline-char-p x)))))) 1)))
+    (declare (type list characters))
+    (coerce characters 'string)))
+
+(defparser yaml-anchor ()
+  '#\& (yaml-identifier))
+
+(defparser yaml-alias ()
+  (for ((anchor (progn '#\* (yaml-identifier))))
+    (ensure-gethash anchor (yaml-anchors) (error "Undefined anchor: ~A" anchor))))
+
+(declaim (ftype (function ((simple-array character (*)) t) (values t boolean)) yaml-tag-process-default))
+(defun yaml-tag-process-default (tag value)
+  (values
+   (switch (tag :test #'string=)
+     ("tag:yaml.org,2002:str"
+      (typecase value
+        (string value)
+        (t (princ-to-string value))))
+     ("tag:yaml.org,2002:int"
+      (etypecase value
+        (string
+         (let ((value (parser-run (load-time-value (parser (yaml-number))) value)))
+           (check-type value fixnum)
+           value))
+        (fixnum value)))
+     ("tag:yaml.org,2002:float"
+      (etypecase value
+        (string
+         (let ((value (parser-run (load-time-value (parser (yaml-number))) value)))
+           (check-type value single-float)
+           value))
+        (single-float value)))
+     ("tag:yaml.org,2002:null"
+      (assert (eql value (construct-null)))
+      value)
+     ("tag:yaml.org,2002:bool"
+      (assert (or (eql value (construct-boolean nil)) (eql value (construct-boolean t))))
+      value)
+     ("tag:yaml.org,2002:seq"
+      (assert (or (type= (type-of value) (type-of (construct-mapping nil)))
+                  (type= (type-of value) (type-of (construct-mapping (list nil))))))
+      value)
+     ("tag:yaml.org,2002:map"
+      (assert (or (type= (type-of value) (type-of (construct-mapping nil)))
+                  (type= (type-of value) (type-of (construct-mapping (list (cons nil nil)))))))
+      value)
+     (t (return-from yaml-tag-process-default (values nil nil))))
+   t))
+
+(defparameter *yaml-tags* (list #'yaml-tag-process-default))
+
+(defvar *yaml-tag-shorthands*)
+
+(defun yaml-tag-shorthands ()
+  *yaml-tag-shorthands*)
+
+(defun yaml-tags ()
+  *yaml-tags*)
+
+(defun yaml-tag-process (tag value &optional (tag-processors (yaml-tags)))
+  (loop :for processor :in tag-processors
+        :do (multiple-value-bind (value processedp) (funcall processor tag value)
+              (when processedp (return value)))
+        :finally (error "Unknown tag: ~A" tag)))
+
+(defparser yaml-tag-local ()
+  '#\! (yaml-identifier))
+
+(defparser yaml-tag-global ()
+  '"!!" (for ((name (yaml-identifier)))
+          (declare (type (simple-array character (*)) name))
+          (concatenate 'string "tag:yaml.org,2002:" name)))
+
+(defparser yaml-tag-verbatim ()
+  (prog2 '"!<"
+      (for ((uri (rep (satisfies (lambda (c) (not (char= c #\>)))) 1)))
+        (declare (type list uri))
+        (coerce uri 'string))
+    '">"))
+
+(defparser yaml-tag-name ()
+  (for ((name (rep (satisfies (lambda (c)
+                                (and (not (yaml-whitespace-char-p c))
+                                     (not (yaml-newline-char-p c))
+                                     (not (char= c #\!)))))
+                   1)))
+    (declare (type list name))
+    (coerce name 'string)))
+
+(defparser yaml-tag-named ()
+  (for ((prefix (progn '#\! (yaml-tag-name)))
+        (suffix (progn '#\! (yaml-identifier))))
+    (declare (type (simple-array character (*)) prefix suffix))
+    (let ((prefix (ensure-gethash prefix (yaml-tag-shorthands) (error "Undefined tag prefix: ~A" prefix))))
+      (declare (type (simple-array character (*)) prefix))
+      (concatenate 'string prefix suffix))))
+
+(defparser yaml-tag ()
+  (or (yaml-tag-verbatim) (yaml-tag-global) (yaml-tag-named) (yaml-tag-local)))
+
+(defparser yaml-block-sequence-element (level)
+  (yaml-indicator '#\-)
+  (yaml-value level))
+
+(defparser yaml-block-sequence (level)
+  (for ((elems (repsep (yaml-block-sequence-element level) (yaml-newline-indent level level) 1)))
+    (construct-sequence elems)))
+
+(defparser yaml-complex-key (level)
+  (yaml-indicator '#\?)
+  (yaml-value level))
+
+(defparser yaml-block-mapping-element-value (level)
+  (or (progn (yaml-newline-indent level level) (yaml-block-sequence level))
+      (yaml-value level)))
+
+(defparser yaml-block-mapping-element (level)
+  (for ((element (or (cons (yaml-complex-key level)
+                           (or (progn (yaml-newline-indent level level)
+                                      (yaml-indicator '#\:)
+                                      (yaml-block-mapping-element-value level))
+                               (constantly (construct-null))))
+                     (cons (or (yaml-value-simple) (yaml-string-unquoted))
+                           (progn (yaml-whitespaces) (yaml-indicator '#\:) (yaml-block-mapping-element-value level))))))
+    (cons (car element) (cdr element))))
+
+(defparser yaml-block-mapping (level)
+  (for ((fields (repsep (yaml-block-mapping-element level) (yaml-newline-indent level level) 1)))
+    (construct-mapping fields)))
+
 (defparser yaml-flow-whitespaces ()
   (rep (yaml-newline) 0)
   (yaml-whitespaces))
@@ -312,17 +402,20 @@
 
 (defparser yaml-flow-value (&optional value-required-p)
   (yaml-flow-whitespaces)
-  (let ((anchor (opt (prog1 (yaml-anchor) (yaml-flow-whitespaces)))))
-    (for ((result (or (prog1 (yaml-value-unquoted)
-                        (yaml-flow-whitespaces)
-                        (peek (yaml-flow-object-terminator)))
-                      (prog1 (or (yaml-value-quoted) (yaml-flow-string-unquoted))
-                        (yaml-flow-whitespaces))
-                      (prog1 (constantly (construct-null))
-                        (yaml-flow-whitespaces)
-                        (rep (not (yaml-flow-brackets)) (if (or value-required-p anchor) 0 1) 1)))))
-      (when anchor (setf (gethash anchor (yaml-anchors)) result))
-      result)))
+  (or (let ((anchor (yaml-anchor)))
+        (for ((value (yaml-flow-value t)))
+          (setf (gethash anchor (yaml-anchors)) value)))
+      (let ((tag (yaml-tag)))
+        (for ((value (yaml-flow-value t)))
+          (yaml-tag-process tag value (yaml-tags))))
+      (or (prog1 (yaml-value-unquoted)
+            (yaml-flow-whitespaces)
+            (peek (yaml-flow-object-terminator)))
+          (prog1 (or (yaml-value-quoted) (yaml-flow-string-unquoted))
+            (yaml-flow-whitespaces))
+          (prog1 (constantly (construct-null))
+            (yaml-flow-whitespaces)
+            (rep (not (yaml-flow-brackets)) (if value-required-p 0 1) 1)))))
 
 (defparser yaml-flow-complex-key ()
   (yaml-indicator '#\?)
@@ -343,14 +436,16 @@
 (defparser yaml-flow-sequence ()
   (for ((list (prog2 '#\[
                   (repsep (yaml-flow-mapping-element t) '#\,)
-                (opt (progn '#\, (yaml-flow-whitespaces)))
+                (opt '#\,)
+                (yaml-flow-whitespaces)
                 (cut '#\]))))
     (construct-sequence list)))
 
 (defparser yaml-flow-mapping ()
   (for ((alist (prog2 '#\{
                    (repsep (yaml-flow-mapping-element nil) '#\,)
-                 (opt (progn '#\, (yaml-flow-whitespaces)))
+                 (opt '#\,)
+                 (yaml-flow-whitespaces)
                  (cut '#\}))))
     (construct-mapping alist)))
 
@@ -371,16 +466,18 @@
 (defparser yaml-value (parent-level)
   (let ((level (constantly (1+ parent-level))))
     (declare (type non-negative-fixnum level))
-    (let ((child-level (yaml-mixed-indent level))
-          (anchor-child-level (opt (cons (yaml-anchor) (yaml-mixed-indent level)))))
-      (let ((child-level (constantly (or (cdr anchor-child-level) child-level))))
-        (declare (type non-negative-fixnum child-level))
-        (for ((result (or (prog1 (yaml-value-simple) (peek (yaml-end-of-value level)))
-                          (yaml-string-multiline level)
-                          (yaml-block-sequence child-level) (yaml-block-mapping child-level)
-                          (yaml-string-unquoted-multiline level) (constantly (construct-null)))))
-          (when-let ((anchor (car anchor-child-level))) (setf (gethash anchor (yaml-anchors)) result))
-          result)))))
+    (let ((child-level (yaml-mixed-indent level)))
+      (declare (type non-negative-fixnum child-level))
+      (or (let ((anchor (yaml-anchor)))
+            (for ((value (yaml-value parent-level)))
+              (setf (gethash anchor (yaml-anchors)) value)))
+          (let ((tag (yaml-tag)))
+            (for ((value (yaml-value parent-level)))
+              (yaml-tag-process tag value (yaml-tags))))
+          (or (prog1 (yaml-value-simple) (peek (yaml-end-of-value level)))
+              (yaml-string-multiline level)
+              (yaml-block-sequence child-level) (yaml-block-mapping child-level)
+              (yaml-string-unquoted-multiline level) (constantly (construct-null)))))))
 
 (defparser yaml-newlines (&optional (count 0))
   (rep (yaml-newline) count)
@@ -403,16 +500,36 @@
 (defparser yaml-document-indicator ()
   (or (yaml-document-begin-indicator) (yaml-document-end-indicator)))
 
+(defparser yaml-directive-yaml ()
+  (for ((nil '"YAML")
+        (nil (yaml-whitespaces 1))
+        (nil '"1.2"))
+    (cons :yaml 1.2)))
+
+(defparser yaml-directive-tag ()
+  (for ((nil '"TAG")
+        (nil (yaml-whitespaces 1))
+        (short (prog2 '#\! (yaml-tag-name) '#\!))
+        (nil (yaml-whitespaces 0))
+        (long (yaml-tag-name)))
+    (cons :tag (cons short long))))
+
 (defparser yaml-directive ()
   '#\%
-  (for ((name (yaml-identifier))
-        (nil (yaml-whitespaces 1))
-        (value (yaml-string-multiline-line)))
-    (declare (type list value))
-    (cons name (coerce value 'string))))
+  (cut (or (yaml-directive-yaml) (yaml-directive-tag))))
+
+(defun yaml-tag-shorthands-update (directives &optional (shorthands (yaml-tag-shorthands)))
+  (loop :initially (clrhash shorthands)
+        :for (key . value) :in directives
+        :do (ecase key
+              (:tag (setf (gethash (car value) shorthands) (cdr value)))
+              (:yaml))))
 
 (defparser yaml-directives ()
-  (rep (progn (yaml-newlines) (yaml-directive))))
+  ((lambda (directives)
+     (yaml-tag-shorthands-update directives (yaml-tag-shorthands))
+     (parser (list)))
+   (rep (progn (yaml-newlines) (yaml-directive)))))
 
 (defparser yaml-document (&optional junk-allowed)
   (opt (prog1 (yaml-directives) (yaml-document-begin)))
