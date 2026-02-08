@@ -2,15 +2,28 @@
 
 A high-performance YAML/JSON parser for Common Lisp.
 
-* Introduction
-Yamson aims to comply with YAML 1.2 (only parsing, no serialization,
-but contributions are welcome), while also supporting fast JSON
-parsing in a subset mode.
+* Features
+- *Full-featured* \\
+  Yamson aims to comply with YAML 1.2 (only parsing, no serialization,
+  but contributions are welcome), while also supporting fast JSON
+  parsing in a subset mode.
 
-Currently, Yamson can parse YAML at speeds around 50MB/s and JSON at
-over 100MB/s on Intel® Core™ i7-11700K.
-
-It is still under development, with most YAML 1.2 features supported.
+  Almost all YAML 1.2 features have been implemented, with
+  [[Incompatibilities with YAML 1.2][a few incompatibilities]].
+- *High performance* \\
+  Yamson can parse YAML at speeds around 50MB/s and JSON at over
+  100MB/s on Intel® Core™ i7-11700K with SBCL.
+- *Low memory footprint* \\
+  Yamson is optimized for memory usage during parsing, reducing
+  unnecessary byte consing and GC pressure, making it suitable for
+  real-time applications (such as game development).
+- *Highly portable* \\
+  Yamson is theoretically compatible with any ANSI-conforming
+  implementation, and has been tested to work on SBCL, CCL, ECL,
+  Clasp, and CLISP.
+- *Minimal dependencies* \\
+  Yamson has very few dependencies and does not rely on foreign
+  libraries such as =libyaml=.
 * Installation
 Yamson and its dependencies are not yet available on Quicklisp. You
 will need to manually clone them into the =local-projects= directory
@@ -25,27 +38,75 @@ Yamson depends on:
   - value1
   - value2")
   (("key" "value1" "value2"))
+
   CL-USER> (yamson:parse "
   ---
   key: [&1 value, *1]
   ---
   ..." :multiple-documents-p t)
   ((("key" "value" "value")) :NULL)
+
   CL-USER> (yamson:parse "
   a: 1
   b: 2
   c: 3")
   (("a" . 1) ("b" . 2) ("c" . 3))
+
   CL-USER> (yamson:parse "
   a: 1
   b: 2
   c: 3" :mapping #'alexandria:alist-hash-table)
   #<HASH-TABLE :TEST EQL :COUNT 3 {1202B6CAD3}>
+
   CL-USER> (yamson:parse "
   - ~
   - null
   - " :sequence (lambda (list) (coerce list 'simple-vector)) :null (constantly (vector)))
   #(#() #() #())
+
   CL-USER> (yamson:parse "{\"a\":1} ..." :subset :json :junk-allowed t)
   (("a" . 1))
+
+  CL-USER> (yamson:parse "!intern SYMBOL" :tags (list (lambda (tag value) (when (string= tag "intern") (values (intern value) t)))))
+  SYMBOL
 #+END_SRC
+* Incompatibilities with YAML 1.2
+The following are known implemented features that are incompatible
+with the YAML 1.2 specification:
+1. Anchors or tags cannot be applied to a sequence at the same
+   indentation level as its parent mapping:
+
+   #+BEGIN_SRC yaml
+     object: !!seq
+     - 1
+     - 2
+     - 3
+   #+END_SRC
+
+   To work around this, you must indent the sequence to the next
+   level:
+
+   #+BEGIN_SRC yaml
+     object: !!seq
+       - 1
+       - 2
+       - 3
+   #+END_SRC
+2. Tags do not influence how the parser interprets the subsequent
+   object. For example:
+
+   #+BEGIN_SRC yaml
+     !!str 1e3
+   #+END_SRC
+
+   This will yield ~"1000.0"~ instead of ~"1e3"~ , since ~1e3~ is first
+   parsed as a number and then converted to a string.
+3. It is not possible to create a self-referential structure using
+   anchors and aliases. For example:
+
+   #+BEGIN_SRC yaml
+     &1 [1, 2, 3, *1]
+   #+END_SRC
+
+   This fails because ~&1~ does not take effect until after ~[1, 2, 3, *1]~
+   has been fully parsed.
