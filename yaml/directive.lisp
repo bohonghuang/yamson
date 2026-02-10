@@ -26,7 +26,5 @@
               (:yaml))))
 
 (defparser yaml-directives ()
-  ((lambda (directives)
-     (yaml-tag-shorthands-update directives (yaml-tag-shorthands))
-     (parser (list)))
-   (rep (progn (yaml-newlines) (yaml-directive)))))
+  (let ((directives (rep (progn (yaml-newlines) (yaml-directive)))))
+    (notinline (constantly (yaml-tag-shorthands-update directives (yaml-tag-shorthands))))))

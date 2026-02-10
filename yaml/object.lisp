@@ -44,6 +44,7 @@
   (yaml-string-unquoted (yaml-flow-object-terminator)))
 
 (defparser yaml-flow-value (&optional value-required-p)
+  (notinline)
   (yaml-flow-whitespaces)
   (or (let ((anchor (yaml-anchor)))
         (for ((value (yaml-flow-value t)))
@@ -93,9 +94,11 @@
     (construct-mapping alist)))
 
 (defparser yaml-value-unquoted ()
+  (notinline)
   (or (yaml-boolean) (yaml-number) (yaml-null)))
 
 (defparser yaml-value-quoted ()
+  (notinline)
   (or (yaml-string-single-quoted) (yaml-string-double-quoted)
       (yaml-flow-sequence) (yaml-flow-mapping)
       (yaml-alias)))
