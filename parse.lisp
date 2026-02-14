@@ -5,8 +5,9 @@
   (:report (lambda (condition stream)
              (format stream "Parse error at position ~A" (yamson-parse-error-position condition)))))
 
-(declaim (ftype (function ((simple-array character (*)) &key (:tags list) (:junk-allowed boolean)) t) parse-yaml-string)
-         (ftype (function ((simple-array character (*)) &key (:junk-allowed boolean)) t) parse-json-string))
+(defgeneric parse-yaml (object &rest args))
+
+(defgeneric parse-json (object &rest args))
 
 (defun parse (object &rest args &key multiple-documents-p subset
                                   (mapping *constructor-mapping*)
@@ -24,10 +25,8 @@
           (if errorp
               (error 'yamson-parse-error :position position)
               (if multiple-documents-p result (destructuring-bind (document) result document))))
-      (etypecase object
-        ((simple-array character (*))
-         (apply
-          (ecase subset
-            ((:json) (setf multiple-documents-p t) #'parse-json-string)
-            ((:yaml nil) #'parse-yaml-string))
-          object args))))))
+      (apply
+       (ecase subset
+         ((:json) (setf multiple-documents-p t) #'parse-json)
+         ((:yaml nil) #'parse-yaml))
+       object args))))

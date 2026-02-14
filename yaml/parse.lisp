@@ -1,7 +1,8 @@
 (in-package #:yamson)
 
-(defun parse-yaml-string (string &key tags junk-allowed)
-  (check-type string (simple-array character (*)))
+(defun parse-yaml-stream (stream &key tags junk-allowed)
+  (assert (input-stream-p stream))
+  (assert (type= (stream-element-type stream) 'character))
   (let* ((tags (append tags *yaml-tags*))
          (*yaml-tags* tags)
          (tag-shorthands (make-hash-table :test #'equal))
@@ -14,7 +15,15 @@
       (with-constructors
         (funcall
          (parser-lambda (input)
-           (declare (type (simple-array character (*)) input)
+           (declare (type parsonic::character-input-stream input)
                     (optimize (speed 3) (debug 0) (safety 0)))
            (yaml-file junk-allowed))
-         string)))))
+         stream)))))
+
+(defmethod parse-yaml ((stream stream) &rest args)
+  (apply #'parse-yaml-stream stream args))
+
+(defmethod parse-yaml ((string string) &rest args)
+  (check-type string (simple-array character (*)))
+  (with-input-from-string (stream string)
+    (apply #'parse-yaml-stream stream args)))

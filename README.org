@@ -24,6 +24,10 @@ A high-performance YAML/JSON parser for Common Lisp.
 - *Minimal dependencies* \\
   Yamson has very few dependencies and does not rely on foreign
   libraries such as =libyaml=.
+- *Streaming parsing support* \\
+  Input doesn't need to be fully loaded into memory in the first
+  place, improving memory efficiency in scenarios such as reading from
+  files.
 * Installation
 Yamson and its dependencies are not yet available on Quicklisp. You
 will need to manually clone them into the =local-projects= directory

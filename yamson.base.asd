@@ -1,5 +1,5 @@
 (defsystem yamson.base
-  :depends-on (#:alexandria #:parsonic)
+  :depends-on (#:alexandria #:parsonic #:parsonic.stream)
   :serial t
   :components ((:file "package")
                (:file "construct")
