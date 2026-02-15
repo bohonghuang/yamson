@@ -23,6 +23,10 @@
 (defmethod parse-yaml ((stream stream) &rest args)
   (apply #'parse-yaml-stream stream args))
 
+(defmethod parse-yaml ((pathname pathname) &rest args)
+  (with-input-from-file (stream pathname)
+    (apply #'parse-yaml-stream stream args)))
+
 (defmethod parse-yaml ((string string) &rest args)
   (check-type string (simple-array character (*)))
   (with-input-from-string (stream string)
