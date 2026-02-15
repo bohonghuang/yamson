@@ -47,7 +47,7 @@ Yamson depends on:
   ---
   key: [&1 value, *1]
   ---
-  ..." :multiple-documents-p t)
+  ..." :mode :yaml-multidoc)
   ((("key" "value" "value")) :NULL)
 
   CL-USER> (yamson:parse "
@@ -59,8 +59,8 @@ Yamson depends on:
   CL-USER> (yamson:parse "
   a: 1
   b: 2
-  c: 3" :mapping #'alexandria:alist-hash-table)
-  #<HASH-TABLE :TEST EQL :COUNT 3 {1202B6CAD3}>
+  c: 3" :mapping (alexandria:rcurry #'alexandria:alist-hash-table :test #'equal))
+  #<HASH-TABLE :TEST EQUAL :COUNT 3 {1202B6CAD3}>
 
   CL-USER> (yamson:parse "
   - ~
@@ -68,7 +68,7 @@ Yamson depends on:
   - " :sequence (lambda (list) (coerce list 'simple-vector)) :null (constantly (vector)))
   #(#() #() #())
 
-  CL-USER> (yamson:parse "{\"a\":1} ..." :subset :json :junk-allowed t)
+  CL-USER> (yamson:parse "{\"a\":1} ..." :mode :json :junk-allowed t)
   (("a" . 1))
 
   CL-USER> (yamson:parse "!intern SYMBOL" :tags (list (lambda (tag value) (when (string= tag "intern") (values (intern value) t)))))
