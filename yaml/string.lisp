@@ -1,11 +1,13 @@
 (in-package #:yamson)
 
 (declaim (ftype (function (list t character &optional list list) (values string)) yaml-string-multiline-impl))
-(defun yaml-string-multiline-impl (characters-list mode separator &optional prefixes (suffixes '(#\Newline)))
+(defun yaml-string-multiline-impl (characters-list mode separator &optional prefixes (suffixes (case mode (#\-) (t '(#\Newline)))))
   (if characters-list
-      (let ((string (make-array (1+ (loop :for characters :of-type list :in characters-list
-                                          :sum (1+ (length characters))
-                                            :of-type non-negative-fixnum))
+      (let ((string (make-array (+ (loop :for characters :of-type list :in characters-list
+                                         :sum (1+ (length characters))
+                                           :of-type non-negative-fixnum)
+                                   (length prefixes)
+                                   (1- (length suffixes)))
                                 :element-type 'character))
             (index 0))
         (declare (type (simple-array character (*)) string)
@@ -19,13 +21,13 @@
                      'index))
           (loop :for character :in prefixes
                 :do (buffer-push character))
-          (loop :for (characters . (characters-next)) :on characters-list
+          (loop :for (characters . has-next-p) :on characters-list
+                :for (characters-next) := has-next-p
                 :do (loop :for character :in (or characters (return))
                           :do (buffer-push character))
-                    (when (or (char= separator #\Newline) (or characters (null characters-next)))
-                      (buffer-push (if (and characters characters-next) separator #\Newline))))
-          (when (plusp (buffer-length))
-            (buffer-pop))
+                :when has-next-p
+                  :when (or (char= separator #\Newline) (or characters (null characters-next)))
+                    :do (buffer-push (if (and characters characters-next) separator #\Newline)))
           (unless (eql mode #\+)
             (loop :for character :of-type character := (buffer-pop)
                   :unless (char= character #\Newline)
@@ -34,7 +36,7 @@
           (unless (eql mode #\-)
             (loop :for character :in suffixes
                   :do (buffer-push character)))
-          (adjust-array string (buffer-length))))
+          (if (= (length string) (buffer-length)) string (adjust-array string (buffer-length)))))
       ""))
 
 (defparser yaml-string-single-quoted-line ()
