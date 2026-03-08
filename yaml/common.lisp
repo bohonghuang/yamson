@@ -26,6 +26,7 @@
 
 (defparser yaml-comment ()
   (for ((comment (progn '#\# (rep (satisfies (lambda (x) (not (yaml-newline-char-p x))))))))
+    (declare (type list comment))
     (coerce comment 'string)))
 
 (defparser yaml-eol ()

@@ -65,12 +65,8 @@
               (or (yaml-indicator '#\:) (yaml-newline-char) (eof) terminator)))
        (satisfies #'characterp)))
 
-(defparser yaml-string-unquoted-line-rest (terminator)
-  (rep (yaml-string-unquoted-character terminator)))
-
-(defparser yaml-string-unquoted-line (terminator)
-  (cons (and (not (yaml-end-of-indicator)) (yaml-string-unquoted-character terminator))
-        (yaml-string-unquoted-line-rest terminator)))
+(defparser yaml-string-unquoted-line (terminator &optional (length 1))
+  (and (not (yaml-comment)) (rep (yaml-string-unquoted-character terminator) length)))
 
 (defparser yaml-string-unquoted (&optional (terminator (or)))
   (for ((characters (yaml-string-unquoted-line terminator)))
@@ -84,7 +80,7 @@
                                       (and
                                        (not (yaml-document-indicator))
                                        (or (progn (yaml-eol) (peek (yaml-newline-char)) (constantly nil))
-                                           (progn (yaml-indent level) (yaml-string-unquoted-line-rest terminator)))))))))
+                                           (progn (yaml-indent level) (yaml-string-unquoted-line terminator 0)))))))))
     (yaml-string-multiline-impl characters-list #\- #\Space)))
 
 (defparser yaml-string-multiline-line ()

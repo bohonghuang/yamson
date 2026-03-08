@@ -281,6 +281,7 @@ key2:
 (define-test yaml-comment :parent yaml
   (is equal '(("key" . "value")) (parse "# This is a comment
 key: value # This is another comment"))
+  (is equal '(("key" . :null)) (parse "key: # This is a comment"))
   (is equal '(("key1" . "value1") ("key2" . "value2")) 
       (parse "key1: value1 # Comment after key1
 # This is a full line comment
