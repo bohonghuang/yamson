@@ -13,12 +13,9 @@
                (yaml-tags () 'tags)
                (yaml-tag-shorthands () 'tag-shorthands))
       (with-constructors
-        (funcall
-         (parser-lambda (input)
-           (declare (type parsonic::character-input-stream input)
-                    (optimize (speed 3) (debug 0) (safety 0)))
-           (yaml-file junk-allowed))
-         stream)))))
+        (parser-run
+         (parser (yaml-file junk-allowed))
+         (the parsonic::character-input-stream stream))))))
 
 (defmethod parse-yaml ((stream stream) &rest args)
   (apply #'parse-yaml-stream stream args))

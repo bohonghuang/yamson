@@ -4,12 +4,9 @@
   (assert (input-stream-p stream))
   (assert (type= (stream-element-type stream) 'character))
   (with-constructors
-    (funcall
-     (parser-lambda (input)
-       (declare (type parsonic::character-input-stream input)
-                (optimize (speed 3) (debug 0) (safety 0)))
-       (json-file junk-allowed))
-     stream)))
+    (parser-run
+     (parser (json-file junk-allowed))
+     (the parsonic::character-input-stream stream))))
 
 (defmethod parse-json ((stream stream) &rest args)
   (apply #'parse-json-stream stream args))
