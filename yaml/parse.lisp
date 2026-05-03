@@ -15,7 +15,7 @@
       (with-constructors
         (parser-run
          (parser (yaml-file junk-allowed))
-         (the parsonic::character-input-stream stream))))))
+         (the parsonic::unbuffered-character-input-stream stream))))))
 
 (defmethod parse-yaml ((stream stream) &rest args)
   (apply #'parse-yaml-stream stream args))

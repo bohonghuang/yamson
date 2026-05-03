@@ -6,7 +6,7 @@
   (with-constructors
     (parser-run
      (parser (json-file junk-allowed))
-     (the parsonic::character-input-stream stream))))
+     (the parsonic::unbuffered-character-input-stream stream))))
 
 (defmethod parse-json ((stream stream) &rest args)
   (apply #'parse-json-stream stream args))
